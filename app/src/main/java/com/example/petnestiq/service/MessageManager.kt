@@ -16,6 +16,7 @@ import com.example.petnestiq.data.MessageType
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.util.Date
 import java.util.UUID
 
 class MessageManager private constructor() {
@@ -81,12 +82,14 @@ class MessageManager private constructor() {
         updateUnreadCount()
     }
 
-    // 根据类型获取消息
+    // 根据类型获取消息 - 标记为内部使用避免警告
+    @Suppress("unused")
     fun getMessagesByType(type: MessageType): List<Message> {
         return _messages.value.filter { it.type == type }
     }
 
-    // 获取未读消息
+    // 获取未读消息 - 标记为内部使用避免警告
+    @Suppress("unused")
     fun getUnreadMessages(): List<Message> {
         return _messages.value.filter { !it.isRead }
     }
@@ -110,7 +113,7 @@ class MessageManager private constructor() {
                 MessageType.ALARM -> "智能宠物窝：报警测试消息"
             },
             content = content,
-            timestamp = java.time.LocalDateTime.now(),
+            timestamp = Date(),
             priority = priority
         )
 
@@ -122,7 +125,8 @@ class MessageManager private constructor() {
         }
     }
 
-    // 发送正常的设备消息
+    // 发送正常的设备消息 - 标记为内部使用避免警告
+    @Suppress("unused")
     fun sendDeviceMessage(
         content: String,
         priority: MessagePriority = MessagePriority.NORMAL,
@@ -134,7 +138,7 @@ class MessageManager private constructor() {
             type = MessageType.DEVICE,
             title = "智能宠物窝：设备通知",
             content = content,
-            timestamp = java.time.LocalDateTime.now(),
+            timestamp = Date(),
             priority = priority,
             deviceId = deviceId
         )
@@ -147,7 +151,8 @@ class MessageManager private constructor() {
         }
     }
 
-    // 发送正常的报警消息
+    // 发送正常的报警消息 - 标记为内部使用避免警告
+    @Suppress("unused")
     fun sendAlarmMessage(
         content: String,
         priority: MessagePriority = MessagePriority.HIGH,
@@ -159,7 +164,7 @@ class MessageManager private constructor() {
             type = MessageType.ALARM,
             title = "智能宠物窝：紧急报警",
             content = content,
-            timestamp = java.time.LocalDateTime.now(),
+            timestamp = Date(),
             priority = priority,
             deviceId = deviceId
         )
@@ -172,7 +177,8 @@ class MessageManager private constructor() {
         }
     }
 
-    // 使用预定义模板发送设备消息
+    // 使用预定义模板发送设备消息 - 标记为内部使用避免警告
+    @Suppress("unused")
     fun sendDeviceMessageFromTemplate(
         templateKey: String,
         params: Map<String, String> = emptyMap(),
@@ -200,7 +206,8 @@ class MessageManager private constructor() {
         }
     }
 
-    // 使用预定义模板发送报警消息
+    // 使用预定义模板发送报警消息 - 标记为内部使用避免警告
+    @Suppress("unused")
     fun sendAlarmMessageFromTemplate(
         templateKey: String,
         params: Map<String, String> = emptyMap(),
@@ -233,30 +240,32 @@ object NotificationService {
 
     // 创建通知渠道
     fun createNotificationChannels(context: Context) {
-        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
-        // 设备消息渠道
-        val deviceChannel = NotificationChannel(
-            MessageManager.DEVICE_CHANNEL_ID,
-            "设备消息",
-            NotificationManager.IMPORTANCE_DEFAULT
-        ).apply {
-            description = "来自智能宠物窝的设备状态消息"
+            // 设备消息渠道
+            val deviceChannel = NotificationChannel(
+                MessageManager.DEVICE_CHANNEL_ID,
+                "设备消息",
+                NotificationManager.IMPORTANCE_DEFAULT
+            ).apply {
+                description = "来自智能宠物窝的设备状态消息"
+            }
+
+            // 报警消息渠道
+            val alarmChannel = NotificationChannel(
+                MessageManager.ALARM_CHANNEL_ID,
+                "报警消息",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "来自智能宠物窝的紧急报警消息"
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 1000, 500, 1000)
+            }
+
+            notificationManager.createNotificationChannel(deviceChannel)
+            notificationManager.createNotificationChannel(alarmChannel)
         }
-
-        // 报警消息渠道
-        val alarmChannel = NotificationChannel(
-            MessageManager.ALARM_CHANNEL_ID,
-            "报警消息",
-            NotificationManager.IMPORTANCE_HIGH
-        ).apply {
-            description = "来自智能宠物窝的紧急报警消息"
-            enableVibration(true)
-            vibrationPattern = longArrayOf(0, 1000, 500, 1000)
-        }
-
-        notificationManager.createNotificationChannel(deviceChannel)
-        notificationManager.createNotificationChannel(alarmChannel)
     }
 
     // 发送通知
@@ -273,11 +282,8 @@ object NotificationService {
             MessagePriority.URGENT -> NotificationCompat.PRIORITY_MAX
         }
 
-        // 检测是否为MIUI系统
-        val isMIUI = isMIUISystem()
-
         val notification = NotificationCompat.Builder(context, channelId)
-            .setSmallIcon(R.drawable.ic_launcher_foreground) // 统一使用应用前景图标
+            .setSmallIcon(R.drawable.cat) // 使用cat图标作为小图标
             .setContentTitle(message.title)
             .setContentText(message.content)
             .setPriority(priority)
@@ -319,22 +325,10 @@ object NotificationService {
         }
     }
 
-    // 检测是否为MIUI系统
-    private fun isMIUISystem(): Boolean {
-        return try {
-            val prop = Class.forName("android.os.SystemProperties")
-            val method = prop.getMethod("get", String::class.java)
-            val miui = method.invoke(null, "ro.miui.ui.version.name") as String
-            miui.isNotEmpty()
-        } catch (e: Exception) {
-            false
-        }
-    }
-
     // 将Drawable转换为Bitmap
     private fun getBitmapFromDrawable(context: Context, drawableId: Int): android.graphics.Bitmap? {
         return try {
-            val drawable = androidx.core.content.ContextCompat.getDrawable(context, drawableId)
+            val drawable = ContextCompat.getDrawable(context, drawableId)
             drawable?.let {
                 val bitmap = android.graphics.Bitmap.createBitmap(
                     it.intrinsicWidth,
@@ -351,7 +345,8 @@ object NotificationService {
         }
     }
 
-    // 检查并请求通知权限
+    // 检查并请求通知权限 - 标记为内部使用避免警告
+    @Suppress("unused")
     fun checkNotificationPermission(context: Context): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             ContextCompat.checkSelfPermission(

@@ -1,7 +1,7 @@
 package com.example.petnestiq.data
 
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
+import java.text.SimpleDateFormat
+import java.util.*
 
 // 消息类型枚举
 enum class MessageType {
@@ -23,28 +23,47 @@ data class Message(
     val type: MessageType,
     val title: String,
     val content: String,
-    val timestamp: LocalDateTime,
+    val timestamp: Date,
     val priority: MessagePriority = MessagePriority.NORMAL,
     val isRead: Boolean = false,
     val deviceId: String? = null
 ) {
     fun getFormattedTime(): String {
-        val now = LocalDateTime.now()
-        val formatter = when {
-            timestamp.toLocalDate() == now.toLocalDate() -> {
-                DateTimeFormatter.ofPattern("HH:mm")
+        val now = Date()
+        val nowCalendar = Calendar.getInstance().apply { time = now }
+        val timestampCalendar = Calendar.getInstance().apply { time = timestamp }
+
+        return when {
+            // 今天
+            isSameDay(timestampCalendar, nowCalendar) -> {
+                SimpleDateFormat("HH:mm", Locale.getDefault()).format(timestamp)
             }
-            timestamp.toLocalDate() == now.toLocalDate().minusDays(1) -> {
-                DateTimeFormatter.ofPattern("昨天 HH:mm")
+            // 昨天
+            isYesterday(timestampCalendar, nowCalendar) -> {
+                "昨天 " + SimpleDateFormat("HH:mm", Locale.getDefault()).format(timestamp)
             }
-            timestamp.year == now.year -> {
-                DateTimeFormatter.ofPattern("MM-dd HH:mm")
+            // 今年
+            timestampCalendar.get(Calendar.YEAR) == nowCalendar.get(Calendar.YEAR) -> {
+                SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()).format(timestamp)
             }
+            // 其他年份
             else -> {
-                DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+                SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(timestamp)
             }
         }
-        return timestamp.format(formatter)
+    }
+
+    private fun isSameDay(cal1: Calendar, cal2: Calendar): Boolean {
+        return cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR) &&
+                cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR)
+    }
+
+    private fun isYesterday(timestampCal: Calendar, nowCal: Calendar): Boolean {
+        val yesterday = Calendar.getInstance().apply {
+            time = nowCal.time
+            add(Calendar.DAY_OF_YEAR, -1)
+        }
+        return isSameDay(timestampCal, yesterday)
     }
 
     fun getTypeDisplayName(): String {
@@ -54,6 +73,8 @@ data class Message(
         }
     }
 
+    // 保留但标记为内部使用，避免警告
+    @Suppress("unused")
     fun getPriorityDisplayName(): String {
         return when (priority) {
             MessagePriority.LOW -> "低"
@@ -64,12 +85,11 @@ data class Message(
     }
 }
 
-// 预定义的消息模板
+// 消息模板
 object MessageTemplates {
-
     // 设备消息模板
     val deviceTemplates = mapOf(
-        "connection_lost" to "设备连接断开，请检查网络连接",
+        "connection_lost" to "设备连接丢失，正在尝试重新连接...",
         "connection_restored" to "设备连接已恢复",
         "low_battery" to "设备电量不足，请及时充电",
         "temperature_warning" to "温度异常，当前温度：{temperature}°C",
@@ -109,9 +129,9 @@ object MessageTemplates {
         return Message(
             id = id,
             type = MessageType.DEVICE,
-            title = "设备通知",
+            title = "智能宠物窝：设备通知",
             content = content,
-            timestamp = LocalDateTime.now(),
+            timestamp = Date(),
             priority = priority,
             deviceId = deviceId
         )
@@ -133,9 +153,9 @@ object MessageTemplates {
         return Message(
             id = id,
             type = MessageType.ALARM,
-            title = "报警通知",
+            title = "智能宠物窝：紧急报警",
             content = content,
-            timestamp = LocalDateTime.now(),
+            timestamp = Date(),
             priority = priority,
             deviceId = deviceId
         )
