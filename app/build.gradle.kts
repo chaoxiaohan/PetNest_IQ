@@ -10,7 +10,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.petnestiq"
-        minSdk = 24
+        minSdk = 26  // 提高到API 26以获得更好的Material You支持
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"

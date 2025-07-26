@@ -1,5 +1,6 @@
 package com.example.petnestiq
 
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -19,7 +20,8 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             PetNestIQTheme(
-                dynamicColor = true // 确保启用动态颜色（莫奈取色）
+                // 在Android 12+设备上启用动态颜色（Material You）
+                dynamicColor = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
             ) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
@@ -31,11 +33,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+
 @Preview(showBackground = true)
 @Composable
 fun DefaultPreview() {
     PetNestIQTheme(
-        dynamicColor = true // Preview中也启用动态颜色
+        dynamicColor = true // Preview中启用动态颜色预览
     ) {
         MainNavigation()
     }

@@ -2,6 +2,7 @@ package com.example.petnestiq.navigation
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -50,12 +51,6 @@ fun MainNavigation() {
             composable(NavigationItem.Device.route) {
                 DeviceScreen()
             }
-            composable(NavigationItem.Control.route) {
-                ControlScreen()
-            }
-            composable(NavigationItem.Data.route) {
-                DataScreen()
-            }
             composable(NavigationItem.Message.route) {
                 MessageScreen()
             }
@@ -86,7 +81,8 @@ fun BottomNavigationBar(navController: NavController) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier.padding(
-                            top = if (isSelected) 0.dp else 8.dp
+                            top = if (isSelected) 6.dp else 12.dp,
+                            bottom = 6.dp
                         )
                     ) {
                         Icon(
@@ -100,23 +96,13 @@ fun BottomNavigationBar(navController: NavController) {
                         )
 
                         // 只在选中状态下显示文字
-                        AnimatedVisibility(
-                            visible = isSelected,
-                            enter = slideInVertically(
-                                initialOffsetY = { 20 },
-                                animationSpec = tween(200)
-                            ) + fadeIn(animationSpec = tween(200)),
-                            exit = slideOutVertically(
-                                targetOffsetY = { 20 },
-                                animationSpec = tween(200)
-                            ) + fadeOut(animationSpec = tween(200))
-                        ) {
+                        if (isSelected) {
+                            Spacer(modifier = Modifier.height(4.dp))
                             Text(
                                 text = item.title,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(top = 4.dp)
+                                color = MaterialTheme.colorScheme.primary
                             )
                         }
                     }

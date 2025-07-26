@@ -3,6 +3,7 @@ package com.example.petnestiq.screens
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -10,7 +11,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -251,6 +256,12 @@ fun DeviceScreen() {
                 targetTemperature = targetTemperature,
                 onTemperatureChange = { targetTemperature = it },
                 modifier = Modifier
+            )
+
+            // 第五行：云端监控视频模块
+            Spacer(modifier = Modifier.height(8.dp))
+            CloudVideoMonitorCard(
+                modifier = Modifier.fillMaxWidth()
             )
         }
     }
@@ -530,6 +541,281 @@ fun MiniChart(
                 textY,
                 textPaint
             )
+        }
+    }
+}
+
+// 云端视频监控状态枚举
+enum class VideoStreamStatus {
+    LOADING,    // 加载中
+    PLAYING,    // 播放中
+    PAUSED,     // 暂停
+    ERROR,      // 错误
+    OFFLINE     // 离线
+}
+
+// 视频流数据类
+data class VideoStreamInfo(
+    val streamUrl: String,
+    val resolution: String,
+    val quality: String,
+    val isLive: Boolean
+)
+
+@Composable
+fun CloudVideoMonitorCard(
+    modifier: Modifier = Modifier
+) {
+    var videoStatus by remember { mutableStateOf(VideoStreamStatus.OFFLINE) }
+    var isPlaying by remember { mutableStateOf(false) }
+    var showSettings by remember { mutableStateOf(false) }
+
+    Card(
+        modifier = modifier.height(300.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp)
+        ) {
+            // 标题栏
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "云端监控",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    // 实时状态指示器
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(
+                                when (videoStatus) {
+                                    VideoStreamStatus.PLAYING -> Color(0xFF4CAF50)
+                                    VideoStreamStatus.LOADING -> Color(0xFFFF9800)
+                                    VideoStreamStatus.ERROR -> Color(0xFFF44336)
+                                    else -> Color.Gray
+                                }
+                            )
+                    )
+
+                    Spacer(modifier = Modifier.width(4.dp))
+
+                    Text(
+                        text = when (videoStatus) {
+                            VideoStreamStatus.PLAYING -> "直播中"
+                            VideoStreamStatus.LOADING -> "连接中"
+                            VideoStreamStatus.PAUSED -> "已暂停"
+                            VideoStreamStatus.ERROR -> "连接失败"
+                            VideoStreamStatus.OFFLINE -> "离线"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    )
+                }
+
+                // 设置按钮
+                IconButton(
+                    onClick = { showSettings = !showSettings },
+                    modifier = Modifier.size(24.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Settings,
+                        contentDescription = "设置",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // 视频播放区域 - 增加高度
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp),
+                shape = RoundedCornerShape(8.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color.Black
+                )
+            ) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    when (videoStatus) {
+                        VideoStreamStatus.OFFLINE, VideoStreamStatus.ERROR -> {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Icon(
+                                    Icons.Default.Refresh,
+                                    contentDescription = "重新连接",
+                                    tint = Color.White.copy(alpha = 0.6f),
+                                    modifier = Modifier.size(32.dp)
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = if (videoStatus == VideoStreamStatus.ERROR) "连接失败" else "点击连接",
+                                    color = Color.White.copy(alpha = 0.6f),
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                        }
+                        VideoStreamStatus.LOADING -> {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                CircularProgressIndicator(
+                                    color = Color.White,
+                                    modifier = Modifier.size(24.dp),
+                                    strokeWidth = 2.dp
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "正在连接...",
+                                    color = Color.White.copy(alpha = 0.8f),
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                        }
+                        VideoStreamStatus.PLAYING, VideoStreamStatus.PAUSED -> {
+                            // TODO: 这里将来集成实际的视频播放器
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(Color.Black)
+                                    .clickable {
+                                        isPlaying = !isPlaying
+                                        videoStatus = if (isPlaying) VideoStreamStatus.PLAYING else VideoStreamStatus.PAUSED
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (videoStatus == VideoStreamStatus.PAUSED) {
+                                    Icon(
+                                        Icons.Default.PlayArrow,
+                                        contentDescription = "播放",
+                                        tint = Color.White.copy(alpha = 0.8f),
+                                        modifier = Modifier.size(48.dp)
+                                    )
+                                }
+
+                                // 模拟视频内容（占位符）
+                                Text(
+                                    text = "实时监控画面",
+                                    color = Color.White.copy(alpha = 0.5f),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.align(Alignment.TopStart).padding(8.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // 控制按钮区域
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                // 播放/暂停按钮
+                IconButton(
+                    onClick = {
+                        when (videoStatus) {
+                            VideoStreamStatus.OFFLINE, VideoStreamStatus.ERROR -> {
+                                videoStatus = VideoStreamStatus.LOADING
+                                // TODO: 启动视频流连接
+                                // 模拟连接延迟
+                                kotlin.concurrent.thread {
+                                    Thread.sleep(2000)
+                                    videoStatus = VideoStreamStatus.PLAYING
+                                    isPlaying = true
+                                }
+                            }
+                            VideoStreamStatus.PLAYING -> {
+                                videoStatus = VideoStreamStatus.PAUSED
+                                isPlaying = false
+                            }
+                            VideoStreamStatus.PAUSED -> {
+                                videoStatus = VideoStreamStatus.PLAYING
+                                isPlaying = true
+                            }
+                            else -> {}
+                        }
+                    },
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Icon(
+                        when (videoStatus) {
+                            VideoStreamStatus.PLAYING -> Icons.Default.Pause
+                            else -> Icons.Default.PlayArrow
+                        },
+                        contentDescription = if (isPlaying) "暂停" else "播放",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+
+                // 刷新按钮
+                IconButton(
+                    onClick = {
+                        videoStatus = VideoStreamStatus.LOADING
+                        // TODO: 重新连接视频流
+                        kotlin.concurrent.thread {
+                            Thread.sleep(1500)
+                            videoStatus = VideoStreamStatus.PLAYING
+                            isPlaying = true
+                        }
+                    },
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Refresh,
+                        contentDescription = "刷新",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
+
+            // 视频信息显示
+            if (videoStatus == VideoStreamStatus.PLAYING) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "1080P",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    )
+                    Text(
+                        text = "延迟: 200ms",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    )
+                }
+            }
         }
     }
 }
