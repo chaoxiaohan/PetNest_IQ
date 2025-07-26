@@ -18,7 +18,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            PetNestIQTheme {
+            PetNestIQTheme(
+                dynamicColor = true // 确保启用动态颜色（莫奈取色）
+            ) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
@@ -32,7 +34,9 @@ class MainActivity : ComponentActivity() {
 @Preview(showBackground = true)
 @Composable
 fun DefaultPreview() {
-    PetNestIQTheme {
+    PetNestIQTheme(
+        dynamicColor = true // Preview中也启用动态颜色
+    ) {
         MainNavigation()
     }
 }

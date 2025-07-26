@@ -1,5 +1,6 @@
 package com.example.petnestiq.screens
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -15,7 +16,15 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -23,6 +32,47 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.petnestiq.R
+import kotlin.math.sin
+import kotlin.random.Random
+
+// 数据类定义
+data class ChartDataPoint(
+    val hour: Int,  // 0-24小时
+    val value: Float
+)
+
+// 生成模拟数据的函数
+fun generateTemperatureData(): List<ChartDataPoint> {
+    return (0..23).map { hour ->
+        // 模拟温度变化：夜间较低，白天较高
+        val baseTemp = 20f + 8f * sin((hour - 6) * Math.PI / 12).toFloat() + Random.nextFloat() * 3f
+        ChartDataPoint(hour, baseTemp.coerceIn(15f, 35f))
+    }
+}
+
+fun generateHumidityData(): List<ChartDataPoint> {
+    return (0..23).map { hour ->
+        // 模拟湿度变化：相对稳定，有小幅波动
+        val baseHumidity = 60f + 15f * sin((hour - 3) * Math.PI / 12).toFloat() + Random.nextFloat() * 10f
+        ChartDataPoint(hour, baseHumidity.coerceIn(40f, 85f))
+    }
+}
+
+fun generateFoodData(): List<ChartDataPoint> {
+    return (0..23).map { hour ->
+        // 模拟食物量变化：逐渐减少，定时补充
+        val baseFood = if (hour % 8 == 0) 500f else 500f - (hour % 8) * 50f + Random.nextFloat() * 20f
+        ChartDataPoint(hour, baseFood.coerceIn(0f, 500f))
+    }
+}
+
+fun generateWaterData(): List<ChartDataPoint> {
+    return (0..23).map { hour ->
+        // 模拟水量变化：逐渐减少，定时补充
+        val baseWater = if (hour % 6 == 0) 500f else 500f - (hour % 6) * 70f + Random.nextFloat() * 30f
+        ChartDataPoint(hour, baseWater.coerceIn(0f, 500f))
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -137,11 +187,15 @@ fun DeviceScreen() {
                 EnvironmentCard(
                     label = "温度",
                     value = "25°C",
+                    chartData = generateTemperatureData(),
+                    chartColor = Color.Red,
                     modifier = Modifier.weight(1f)
                 )
                 EnvironmentCard(
                     label = "湿度",
                     value = "60%",
+                    chartData = generateHumidityData(),
+                    chartColor = Color.Blue,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -156,11 +210,15 @@ fun DeviceScreen() {
                 EnvironmentCard(
                     label = "食物量",
                     value = "500g",
+                    chartData = generateFoodData(),
+                    chartColor = Color.Green,
                     modifier = Modifier.weight(1f)
                 )
                 EnvironmentCard(
                     label = "水量",
                     value = "500ml",
+                    chartData = generateWaterData(),
+                    chartColor = Color.Cyan,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -173,13 +231,13 @@ fun DeviceScreen() {
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 SwitchCard(
-                    label = "通风状态",
+                    label = "通风开关",
                     checked = ventilationEnabled,
                     onCheckedChange = { ventilationEnabled = it },
                     modifier = Modifier.weight(1f)
                 )
                 SwitchCard(
-                    label = "消毒状态",
+                    label = "消毒开关",
                     checked = disinfectionEnabled,
                     onCheckedChange = { disinfectionEnabled = it },
                     modifier = Modifier.weight(1f)
@@ -202,6 +260,8 @@ fun DeviceScreen() {
 fun EnvironmentCard(
     label: String,
     value: String,
+    chartData: List<ChartDataPoint>,
+    chartColor: Color,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -236,19 +296,15 @@ fun EnvironmentCard(
                 fontWeight = FontWeight.Bold
             )
 
-            // 第三行留空给曲线
+            // 第三行显示曲线图
             Spacer(modifier = Modifier.weight(1f))
-            Box(
+            MiniChart(
+                data = chartData,
+                lineColor = chartColor,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(20.dp)
-                    .background(
-                        Color.Transparent,
-                        RoundedCornerShape(4.dp)
-                    )
-            ) {
-                // 这里可以放置曲线图
-            }
+            )
         }
     }
 }
@@ -382,6 +438,98 @@ fun HeatingCard(
                     )
                 }
             }
+        }
+    }
+}
+
+// 曲线图组件
+@Composable
+fun MiniChart(
+    data: List<ChartDataPoint>,
+    lineColor: Color,
+    modifier: Modifier = Modifier
+) {
+    Canvas(modifier = modifier) {
+        if (data.isEmpty()) return@Canvas
+
+        val width = size.width
+        val height = size.height
+        val padding = 8.dp.toPx()
+        val textHeight = 10.dp.toPx()
+
+        // 计算数据范围
+        val minValue = data.minOf { it.value }
+        val maxValue = data.maxOf { it.value }
+        val valueRange = maxValue - minValue
+
+        // 为时间标签留出空间
+        val chartHeight = height - textHeight - 4.dp.toPx()
+
+        // 创建路径
+        val path = Path()
+
+        data.forEachIndexed { index, point ->
+            val x = padding + (width - 2 * padding) * (point.hour / 23f)
+            val y = padding + (chartHeight - 2 * padding) * (1 - (point.value - minValue) / valueRange)
+
+            if (index == 0) {
+                path.moveTo(x, y)
+            } else {
+                path.lineTo(x, y)
+            }
+        }
+
+        // 绘制曲线
+        drawPath(
+            path = path,
+            color = lineColor,
+            style = Stroke(
+                width = 1.5.dp.toPx(),
+                cap = StrokeCap.Round,
+                join = StrokeJoin.Round
+            )
+        )
+
+        // 绘制数据点
+        data.forEach { point ->
+            val x = padding + (width - 2 * padding) * (point.hour / 23f)
+            val y = padding + (chartHeight - 2 * padding) * (1 - (point.value - minValue) / valueRange)
+
+            drawCircle(
+                color = lineColor,
+                radius = 1.dp.toPx(),
+                center = Offset(x, y)
+            )
+        }
+
+        // 绘制时间轴文字标签
+        drawIntoCanvas { canvas ->
+            val textPaint = android.graphics.Paint().apply {
+                color = Color.Gray.toArgb()
+                textSize = 8.sp.toPx()
+                isAntiAlias = true
+            }
+
+            // 绘制"0:00"标签
+            val startX = padding
+            val textY = height - 2.dp.toPx()
+            textPaint.textAlign = android.graphics.Paint.Align.LEFT
+            canvas.nativeCanvas.drawText(
+                "0:00",
+                startX,
+                textY,
+                textPaint
+            )
+
+            // 绘制"24:00"标签
+            val endX = width - padding
+            textPaint.textAlign = android.graphics.Paint.Align.RIGHT
+            canvas.nativeCanvas.drawText(
+                "24:00",
+                endX,
+                textY,
+                textPaint
+            )
         }
     }
 }

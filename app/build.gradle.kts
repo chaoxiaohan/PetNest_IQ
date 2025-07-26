@@ -51,6 +51,8 @@ dependencies {
     implementation(libs.androidx.material3)
     implementation("androidx.navigation:navigation-compose:2.7.5")
     implementation("androidx.compose.material:material-icons-extended:1.5.4")
+    // 添加动态颜色支持（莫奈取色）
+    implementation("androidx.compose.material3:material3-window-size-class:1.1.2")
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
