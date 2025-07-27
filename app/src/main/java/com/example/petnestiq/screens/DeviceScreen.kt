@@ -36,7 +36,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavController
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.petnestiq.R
+import com.example.petnestiq.navigation.NavigationItem
+import com.example.petnestiq.data.DeviceDataManager
+import com.example.petnestiq.data.DataType
 import kotlin.math.sin
 import kotlin.random.Random
 
@@ -81,15 +86,26 @@ fun generateWaterData(): List<ChartDataPoint> {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DeviceScreen() {
-    // 连接状态 - 可以是 Connected, Disconnected, null
-    var connectionStatus by remember { mutableStateOf<String?>(null) }
+fun DeviceScreen(navController: NavController? = null) {
+    // 获取数据管理器实例
+    val deviceDataManager = remember { DeviceDataManager.getInstance() }
+    val deviceData by deviceDataManager.deviceData.collectAsStateWithLifecycle()
+    val connectionStatus by deviceDataManager.connectionStatus.collectAsStateWithLifecycle()
+
     var ventilationEnabled by remember { mutableStateOf(true) }
     var disinfectionEnabled by remember { mutableStateOf(false) }
     var heatingEnabled by remember { mutableStateOf(false) }
     var targetTemperature by remember { mutableStateOf(25) }
 
     val scrollState = rememberScrollState()
+
+    // 模拟数据更新（每30秒更新一次）
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(30000) // 30秒
+            deviceDataManager.simulateDataUpdate()
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -191,17 +207,19 @@ fun DeviceScreen() {
             ) {
                 EnvironmentCard(
                     label = "温度",
-                    value = "25°C",
+                    value = "${deviceData.temperature.toInt()}°C",
                     chartData = generateTemperatureData(),
                     chartColor = Color.Red,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    onClick = { navController?.navigate(NavigationItem.TemperatureDetail.route) }
                 )
                 EnvironmentCard(
                     label = "湿度",
-                    value = "60%",
+                    value = "${deviceData.humidity.toInt()}%",
                     chartData = generateHumidityData(),
                     chartColor = Color.Blue,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    onClick = { navController?.navigate(NavigationItem.HumidityDetail.route) }
                 )
             }
 
@@ -214,17 +232,19 @@ fun DeviceScreen() {
             ) {
                 EnvironmentCard(
                     label = "食物量",
-                    value = "500g",
+                    value = "${deviceData.foodAmount.toInt()}g",
                     chartData = generateFoodData(),
                     chartColor = Color.Green,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    onClick = { navController?.navigate(NavigationItem.FoodDetail.route) }
                 )
                 EnvironmentCard(
                     label = "水量",
-                    value = "500ml",
+                    value = "${deviceData.waterAmount.toInt()}ml",
                     chartData = generateWaterData(),
                     chartColor = Color.Cyan,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    onClick = { navController?.navigate(NavigationItem.WaterDetail.route) }
                 )
             }
 
@@ -273,10 +293,13 @@ fun EnvironmentCard(
     value: String,
     chartData: List<ChartDataPoint>,
     chartColor: Color,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit = {}
 ) {
     Card(
-        modifier = modifier.height(120.dp),
+        modifier = modifier
+            .height(120.dp)
+            .clickable(onClick = onClick),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.secondaryContainer

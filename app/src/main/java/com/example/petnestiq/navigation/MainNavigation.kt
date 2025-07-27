@@ -20,6 +20,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.petnestiq.screens.*
+import com.example.petnestiq.data.DataType
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -49,13 +50,38 @@ fun MainNavigation() {
             }
         ) {
             composable(NavigationItem.Device.route) {
-                DeviceScreen()
+                DeviceScreen(navController = navController)
             }
             composable(NavigationItem.Message.route) {
                 MessageScreen()
             }
             composable(NavigationItem.Profile.route) {
                 ProfileScreen()
+            }
+            // 详细数据界面
+            composable(NavigationItem.TemperatureDetail.route) {
+                DetailScreen(
+                    dataType = DataType.TEMPERATURE,
+                    onBackClick = { navController.popBackStack() }
+                )
+            }
+            composable(NavigationItem.HumidityDetail.route) {
+                DetailScreen(
+                    dataType = DataType.HUMIDITY,
+                    onBackClick = { navController.popBackStack() }
+                )
+            }
+            composable(NavigationItem.FoodDetail.route) {
+                DetailScreen(
+                    dataType = DataType.FOOD,
+                    onBackClick = { navController.popBackStack() }
+                )
+            }
+            composable(NavigationItem.WaterDetail.route) {
+                DetailScreen(
+                    dataType = DataType.WATER,
+                    onBackClick = { navController.popBackStack() }
+                )
             }
         }
     }
@@ -66,64 +92,76 @@ fun BottomNavigationBar(navController: NavController) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    NavigationBar(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(80.dp),
-        containerColor = MaterialTheme.colorScheme.surface,
-        tonalElevation = 8.dp
-    ) {
-        navigationItems.forEach { item ->
-            val isSelected = currentRoute == item.route
+    // 只在主要界面显示底部导航栏
+    val showBottomBar = currentRoute in listOf(
+        NavigationItem.Device.route,
+        NavigationItem.Message.route,
+        NavigationItem.Profile.route
+    )
 
-            NavigationBarItem(
-                icon = {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.padding(
-                            top = if (isSelected) 6.dp else 12.dp,
-                            bottom = 6.dp
-                        )
-                    ) {
-                        Icon(
-                            imageVector = item.icon,
-                            contentDescription = item.title,
-                            tint = if (isSelected)
-                                MaterialTheme.colorScheme.primary
-                            else
-                                MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(24.dp)
-                        )
+    if (showBottomBar) {
+        NavigationBar(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(80.dp),
+            containerColor = MaterialTheme.colorScheme.surface,
+            tonalElevation = 8.dp
+        ) {
+            navigationItems.forEach { item ->
+                val isSelected = currentRoute == item.route
 
-                        // 只在选中状态下显示文字
-                        if (isSelected) {
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = item.title,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.primary
+                NavigationBarItem(
+                    icon = {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.padding(
+                                top = if (isSelected) 6.dp else 12.dp,
+                                bottom = 6.dp
                             )
+                        ) {
+                            Icon(
+                                imageVector = item.icon,
+                                contentDescription = item.title,
+                                tint = if (isSelected)
+                                    MaterialTheme.colorScheme.primary
+                                else
+                                    MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(24.dp)
+                            )
+
+                            // 只在选中状态下显示文字
+                            if (isSelected) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = item.title,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
                         }
-                    }
-                },
-                selected = isSelected,
-                onClick = {
-                    navController.navigate(item.route) {
-                        // 避免重复点击同一个item时重新创建
-                        popUpTo(navController.graph.startDestinationId) {
-                            saveState = true
+                    },
+                    selected = isSelected,
+                    onClick = {
+                        if (currentRoute != item.route) {
+                            navController.navigate(item.route) {
+                                popUpTo(NavigationItem.Device.route) {
+                                    saveState = true
+                                }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
                         }
-                        launchSingleTop = true
-                        restoreState = true
-                    }
-                },
-                colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = MaterialTheme.colorScheme.primary,
-                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    indicatorColor = Color.Transparent // 移除默认的指示器背景
+                    },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = MaterialTheme.colorScheme.primary,
+                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        selectedTextColor = MaterialTheme.colorScheme.primary,
+                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        indicatorColor = Color.Transparent
+                    )
                 )
-            )
+            }
         }
     }
 }
