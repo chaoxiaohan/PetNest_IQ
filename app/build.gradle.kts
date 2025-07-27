@@ -13,7 +13,7 @@ android {
         minSdk = 26  // 提高到API 26以获得更好的Material You支持
         targetSdk = 35
         versionCode = 1
-        versionName = "1.0"
+        versionName = "1.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -56,6 +56,9 @@ dependencies {
 
     // 添加Coil库用于图片加载
     implementation("io.coil-kt:coil-compose:2.5.0")
+
+    // 添加Gson用于JSON序列化
+    implementation("com.google.code.gson:gson:2.10.1")
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

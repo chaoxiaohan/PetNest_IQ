@@ -23,15 +23,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil.compose.AsyncImage
+import com.example.petnestiq.R
 import com.example.petnestiq.data.Message
 import com.example.petnestiq.data.MessageType
 import com.example.petnestiq.data.MessagePriority
@@ -40,7 +44,8 @@ import com.example.petnestiq.service.MessageManager
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MessageScreen() {
-    val messageManager = remember { MessageManager.getInstance() }
+    val context = LocalContext.current
+    val messageManager = remember { MessageManager.getInstance(context) }
     val messages by messageManager.messages.collectAsStateWithLifecycle()
     val unreadCount by messageManager.unreadCount.collectAsStateWithLifecycle()
 
@@ -322,9 +327,11 @@ fun DataScreen() {
 
 @Composable
 fun ProfileScreen(navController: androidx.navigation.NavController? = null) {
-    val userInfoManager = remember { com.example.petnestiq.data.UserInfoManager.getInstance() }
+    val context = LocalContext.current
+    val userInfoManager = remember { com.example.petnestiq.data.UserInfoManager.getInstance(context) }
     val userInfo by userInfoManager.userInfo.collectAsStateWithLifecycle()
     var showDebugOptions by remember { mutableStateOf(false) }
+    var showAboutDialog by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -359,28 +366,45 @@ fun ProfileScreen(navController: androidx.navigation.NavController? = null) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // 左侧头像 - 智能显示逻辑
-                if (userInfo.avatarUri != null) {
-                    // 显示相册选择的头像
-                    coil.compose.AsyncImage(
-                        model = userInfo.avatarUri,
-                        contentDescription = "用户头像",
-                        modifier = Modifier
-                            .size(60.dp)
-                            .clip(CircleShape)
-                            .border(2.dp, MaterialTheme.colorScheme.primary, CircleShape),
-                        contentScale = ContentScale.Crop
-                    )
-                } else {
-                    // 显示默认资源头像
-                    Image(
-                        painter = painterResource(id = userInfo.avatarResourceId),
-                        contentDescription = "用户头像",
-                        modifier = Modifier
-                            .size(60.dp)
-                            .clip(CircleShape)
-                            .border(2.dp, MaterialTheme.colorScheme.primary, CircleShape),
-                        contentScale = ContentScale.Crop
-                    )
+                when {
+                    userInfo.savedAvatarPath != null -> {
+                        // 显示保存到应用内的头像文件
+                        AsyncImage(
+                            model = java.io.File(userInfo.savedAvatarPath),
+                            contentDescription = "用户头像",
+                            modifier = Modifier
+                                .size(60.dp)
+                                .clip(CircleShape)
+                                .border(2.dp, MaterialTheme.colorScheme.primary, CircleShape),
+                            contentScale = ContentScale.Crop,
+                            error = painterResource(id = userInfo.avatarResourceId) // 如果文件损坏则显示默认头像
+                        )
+                    }
+                    userInfo.avatarUri != null -> {
+                        // 显示URI头像（可能无效）
+                        AsyncImage(
+                            model = userInfo.avatarUri,
+                            contentDescription = "用户头像",
+                            modifier = Modifier
+                                .size(60.dp)
+                                .clip(CircleShape)
+                                .border(2.dp, MaterialTheme.colorScheme.primary, CircleShape),
+                            contentScale = ContentScale.Crop,
+                            error = painterResource(id = userInfo.avatarResourceId) // 如果URI无效则显示默认头像
+                        )
+                    }
+                    else -> {
+                        // 显示默认资源头像
+                        Image(
+                            painter = painterResource(id = userInfo.avatarResourceId),
+                            contentDescription = "用户头像",
+                            modifier = Modifier
+                                .size(60.dp)
+                                .clip(CircleShape)
+                                .border(2.dp, MaterialTheme.colorScheme.primary, CircleShape),
+                            contentScale = ContentScale.Crop
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.width(16.dp))
@@ -443,13 +467,20 @@ fun ProfileScreen(navController: androidx.navigation.NavController? = null) {
         ProfileMenuItem(
             title = "关于应用",
             subtitle = "应用版本和开发信息",
-            onClick = { /* TODO: 跳转到关于 */ }
+            onClick = { showAboutDialog = true }
         )
 
         // 调试选项对话框
         if (showDebugOptions) {
             DebugOptionsDialog(
                 onDismiss = { showDebugOptions = false }
+            )
+        }
+
+        // 关于应用对话框
+        if (showAboutDialog) {
+            AboutDialog(
+                onDismiss = { showAboutDialog = false }
             )
         }
     }
@@ -570,7 +601,7 @@ fun DebugOptionsDialog(
 @Composable
 fun MessageTestPanel() {
     val context = LocalContext.current
-    val messageManager = remember { MessageManager.getInstance() }
+    val messageManager = remember { MessageManager.getInstance(context) }
 
     var selectedMessageType by remember { mutableStateOf(MessageType.DEVICE) }
     var messageContent by remember { mutableStateOf("") }
@@ -838,6 +869,8 @@ fun MessageTestPanel() {
 
 @Composable
 fun SystemDebugPanel() {
+    val context = LocalContext.current
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -869,7 +902,7 @@ fun SystemDebugPanel() {
                         fontWeight = FontWeight.Medium
                     )
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("版本: 1.0.0", style = MaterialTheme.typography.bodySmall)
+                    Text("版本: 1.1.0", style = MaterialTheme.typography.bodySmall)
                     Text("构建: Debug", style = MaterialTheme.typography.bodySmall)
                     Text("设备: Android", style = MaterialTheme.typography.bodySmall)
                 }
@@ -879,7 +912,7 @@ fun SystemDebugPanel() {
         item {
             Button(
                 onClick = {
-                    MessageManager.getInstance().clearAllMessages()
+                    MessageManager.getInstance(context).clearAllMessages()
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -935,6 +968,159 @@ fun NetworkTestPanel() {
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("开始网络测试")
+            }
+        }
+    }
+}
+
+@Composable
+fun AboutDialog(
+    onDismiss: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .wrapContentHeight(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // 应用图标
+                Image(
+                    painter = painterResource(id = R.drawable.cat),
+                    contentDescription = "应用图标",
+                    modifier = Modifier
+                        .size(80.dp)
+                        .clip(RoundedCornerShape(16.dp)),
+                    contentScale = ContentScale.Crop
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // 应用名称
+                Text(
+                    text = "PetNestIQ",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    textAlign = TextAlign.Center
+                )
+
+                Text(
+                    text = "智能宠物窝管理系统",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // 版本信息卡片
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "版本 1.1.0",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+
+                        Text(
+                            text = "构建日期：2025年7月27日",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // 开发者信息卡片
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f)
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "开发者",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
+                        )
+
+                        Text(
+                            text = "超小韓",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // 应用简介
+                Text(
+                    text = "PetNestIQ 是一款专业的智能宠物窝管理应用，提供实时监控、智能报警、远程控制等功能，让您随时随地关注爱宠的生活状态。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    lineHeight = 20.sp
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // 版权信息
+                Text(
+                    text = "© 2025 超小韓\n保留所有权利",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // 关闭按钮
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(
+                        text = "关闭",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
             }
         }
     }

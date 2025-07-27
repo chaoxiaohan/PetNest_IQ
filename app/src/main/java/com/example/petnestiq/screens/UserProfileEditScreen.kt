@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -38,7 +39,8 @@ import com.example.petnestiq.data.UserInfoManager
 fun UserProfileEditScreen(
     onBackClick: () -> Unit
 ) {
-    val userInfoManager = remember { UserInfoManager.getInstance() }
+    val context = LocalContext.current
+    val userInfoManager = remember { UserInfoManager.getInstance(context) }
     val userInfo by userInfoManager.userInfo.collectAsStateWithLifecycle()
 
     var nickname by remember { mutableStateOf(userInfo.nickname) }
@@ -119,7 +121,7 @@ fun UserProfileEditScreen(
                 Box(
                     contentAlignment = Alignment.BottomEnd
                 ) {
-                    // 头像显示逻辑：优先显示选择的图片，然后是保存的URI，最后是默认资源
+                    // 头像显示逻辑：优先显示选择的图片，然后是保存的头像文件，最后是默认资源
                     when {
                         selectedImageUri != null -> {
                             // 显示从相册新选择的图片
@@ -134,8 +136,22 @@ fun UserProfileEditScreen(
                                 contentScale = ContentScale.Crop
                             )
                         }
+                        userInfo.savedAvatarPath != null -> {
+                            // 显示保存到应用内的头像文件
+                            AsyncImage(
+                                model = java.io.File(userInfo.savedAvatarPath),
+                                contentDescription = "用户头像",
+                                modifier = Modifier
+                                    .size(100.dp)
+                                    .clip(CircleShape)
+                                    .border(3.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                                    .clickable { showAvatarPicker = true },
+                                contentScale = ContentScale.Crop,
+                                error = painterResource(id = userInfo.avatarResourceId) // 如果文件损坏则显示默认头像
+                            )
+                        }
                         userInfo.avatarUri != null -> {
-                            // 显示已保存的相册图片
+                            // 显示URI头像（可能无效）
                             AsyncImage(
                                 model = userInfo.avatarUri,
                                 contentDescription = "用户头像",
@@ -144,7 +160,8 @@ fun UserProfileEditScreen(
                                     .clip(CircleShape)
                                     .border(3.dp, MaterialTheme.colorScheme.primary, CircleShape)
                                     .clickable { showAvatarPicker = true },
-                                contentScale = ContentScale.Crop
+                                contentScale = ContentScale.Crop,
+                                error = painterResource(id = userInfo.avatarResourceId) // 如果URI无效则显示默认头像
                             )
                         }
                         else -> {

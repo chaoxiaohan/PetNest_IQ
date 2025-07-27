@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.app.NotificationCompat
@@ -13,21 +14,29 @@ import com.example.petnestiq.R
 import com.example.petnestiq.data.Message
 import com.example.petnestiq.data.MessagePriority
 import com.example.petnestiq.data.MessageType
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.util.Date
 import java.util.UUID
 
-class MessageManager private constructor() {
+class MessageManager private constructor(private val context: Context) {
+
+    private val prefs: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    private val gson = Gson()
 
     companion object {
         @Volatile
         private var INSTANCE: MessageManager? = null
 
-        fun getInstance(): MessageManager {
+        private const val PREFS_NAME = "message_prefs"
+        private const val KEY_MESSAGES = "messages"
+
+        fun getInstance(context: Context): MessageManager {
             return INSTANCE ?: synchronized(this) {
-                INSTANCE ?: MessageManager().also { INSTANCE = it }
+                INSTANCE ?: MessageManager(context.applicationContext).also { INSTANCE = it }
             }
         }
 
@@ -36,17 +45,43 @@ class MessageManager private constructor() {
         const val ALARM_CHANNEL_ID = "alarm_messages"
     }
 
-    private val _messages = MutableStateFlow<List<Message>>(emptyList())
+    private val _messages = MutableStateFlow(loadMessages())
     val messages: StateFlow<List<Message>> = _messages.asStateFlow()
 
     private val _unreadCount = MutableStateFlow(0)
     val unreadCount: StateFlow<Int> = _unreadCount.asStateFlow()
+
+    init {
+        updateUnreadCount()
+    }
+
+    // 从SharedPreferences加载消息
+    private fun loadMessages(): List<Message> {
+        val messagesJson = prefs.getString(KEY_MESSAGES, null)
+        return if (messagesJson != null) {
+            try {
+                val type = object : TypeToken<List<Message>>() {}.type
+                gson.fromJson(messagesJson, type) ?: emptyList()
+            } catch (e: Exception) {
+                emptyList()
+            }
+        } else {
+            emptyList()
+        }
+    }
+
+    // 保存消息到SharedPreferences
+    private fun saveMessages(messages: List<Message>) {
+        val messagesJson = gson.toJson(messages)
+        prefs.edit().putString(KEY_MESSAGES, messagesJson).apply()
+    }
 
     // 添加消息
     fun addMessage(message: Message) {
         val currentMessages = _messages.value.toMutableList()
         currentMessages.add(0, message) // 添加到列表开头
         _messages.value = currentMessages
+        saveMessages(currentMessages)
         updateUnreadCount()
     }
 
@@ -57,6 +92,7 @@ class MessageManager private constructor() {
         if (index != -1) {
             currentMessages[index] = currentMessages[index].copy(isRead = true)
             _messages.value = currentMessages
+            saveMessages(currentMessages)
             updateUnreadCount()
         }
     }
@@ -65,6 +101,7 @@ class MessageManager private constructor() {
     fun markAllAsRead() {
         val currentMessages = _messages.value.map { it.copy(isRead = true) }
         _messages.value = currentMessages
+        saveMessages(currentMessages)
         updateUnreadCount()
     }
 
@@ -73,12 +110,14 @@ class MessageManager private constructor() {
         val currentMessages = _messages.value.toMutableList()
         currentMessages.removeAll { it.id == messageId }
         _messages.value = currentMessages
+        saveMessages(currentMessages)
         updateUnreadCount()
     }
 
     // 清空所有消息
     fun clearAllMessages() {
         _messages.value = emptyList()
+        saveMessages(emptyList())
         updateUnreadCount()
     }
 
@@ -206,7 +245,7 @@ class MessageManager private constructor() {
         }
     }
 
-    // 使用预定义模板发送报警消息 - 标记为内部使用避免警告
+    // 使用预定义模板发送报警��息 - 标记为内部使用避免警告
     @Suppress("unused")
     fun sendAlarmMessageFromTemplate(
         templateKey: String,

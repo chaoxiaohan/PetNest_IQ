@@ -1,10 +1,18 @@
 package com.example.petnestiq.data
 
+import android.content.Context
+import android.content.SharedPreferences
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.State
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.io.File
+import java.io.FileOutputStream
+import java.io.IOException
 
 // 用户信息数据类
 data class UserInfo(
@@ -12,64 +20,190 @@ data class UserInfo(
     val petBreed: String,
     val petAge: String,
     val avatarResourceId: Int = com.example.petnestiq.R.drawable.cat,
-    val avatarUri: String? = null // 添加URI字段用于存储相册选择的图片
+    val avatarUri: String? = null, // 存储相册选择的图片URI
+    val savedAvatarPath: String? = null // 存储保存到应用内的头像文件路径
 )
 
 // 用户信息管理器（单例模式）
-class UserInfoManager private constructor() {
+class UserInfoManager private constructor(private val context: Context) {
 
-    // 使用StateFlow管理用户信息状态
-    private val _userInfo = MutableStateFlow(
-        UserInfo(
-            nickname = "铲屎官",
-            petBreed = "英短",
-            petAge = "2岁"
-        )
-    )
-    val userInfo: StateFlow<UserInfo> = _userInfo.asStateFlow()
+    private val prefs: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     companion object {
         @Volatile
         private var INSTANCE: UserInfoManager? = null
 
-        fun getInstance(): UserInfoManager {
+        private const val PREFS_NAME = "user_info_prefs"
+        private const val KEY_NICKNAME = "nickname"
+        private const val KEY_PET_BREED = "pet_breed"
+        private const val KEY_PET_AGE = "pet_age"
+        private const val KEY_AVATAR_RESOURCE_ID = "avatar_resource_id"
+        private const val KEY_AVATAR_URI = "avatar_uri"
+        private const val KEY_SAVED_AVATAR_PATH = "saved_avatar_path"
+        private const val AVATAR_FILENAME = "user_avatar.jpg"
+
+        fun getInstance(context: Context): UserInfoManager {
             return INSTANCE ?: synchronized(this) {
-                INSTANCE ?: UserInfoManager().also { INSTANCE = it }
+                INSTANCE ?: UserInfoManager(context.applicationContext).also { INSTANCE = it }
             }
+        }
+    }
+
+    // 使用StateFlow管理用户信息状态
+    private val _userInfo = MutableStateFlow(loadUserInfo())
+    val userInfo: StateFlow<UserInfo> = _userInfo.asStateFlow()
+
+    // 从SharedPreferences加载用户信息
+    private fun loadUserInfo(): UserInfo {
+        val savedPath = prefs.getString(KEY_SAVED_AVATAR_PATH, null)
+        // 检查保存的头像文件是否还存在
+        val validSavedPath = if (savedPath != null && File(savedPath).exists()) {
+            savedPath
+        } else {
+            null
+        }
+
+        return UserInfo(
+            nickname = prefs.getString(KEY_NICKNAME, "铲屎官") ?: "铲屎官",
+            petBreed = prefs.getString(KEY_PET_BREED, "英短") ?: "英短",
+            petAge = prefs.getString(KEY_PET_AGE, "2岁") ?: "2岁",
+            avatarResourceId = prefs.getInt(KEY_AVATAR_RESOURCE_ID, com.example.petnestiq.R.drawable.cat),
+            avatarUri = prefs.getString(KEY_AVATAR_URI, null),
+            savedAvatarPath = validSavedPath
+        )
+    }
+
+    // 保存用户信息到SharedPreferences
+    private fun saveUserInfo(userInfo: UserInfo) {
+        prefs.edit().apply {
+            putString(KEY_NICKNAME, userInfo.nickname)
+            putString(KEY_PET_BREED, userInfo.petBreed)
+            putString(KEY_PET_AGE, userInfo.petAge)
+            putInt(KEY_AVATAR_RESOURCE_ID, userInfo.avatarResourceId)
+            putString(KEY_AVATAR_URI, userInfo.avatarUri)
+            putString(KEY_SAVED_AVATAR_PATH, userInfo.savedAvatarPath)
+            apply()
+        }
+    }
+
+    // 保存头像���应用内部存储
+    private fun saveAvatarToInternalStorage(uri: Uri): String? {
+        return try {
+            val inputStream = context.contentResolver.openInputStream(uri)
+            val bitmap = BitmapFactory.decodeStream(inputStream)
+            inputStream?.close()
+
+            if (bitmap != null) {
+                // 压缩图片以节省空间
+                val compressedBitmap = compressBitmap(bitmap, 512, 512)
+
+                val avatarFile = File(context.filesDir, AVATAR_FILENAME)
+                val outputStream = FileOutputStream(avatarFile)
+
+                compressedBitmap.compress(Bitmap.CompressFormat.JPEG, 90, outputStream)
+                outputStream.close()
+
+                bitmap.recycle()
+                compressedBitmap.recycle()
+
+                avatarFile.absolutePath
+            } else {
+                null
+            }
+        } catch (e: IOException) {
+            e.printStackTrace()
+            null
+        }
+    }
+
+    // 压缩图片到指定尺寸
+    private fun compressBitmap(bitmap: Bitmap, maxWidth: Int, maxHeight: Int): Bitmap {
+        val width = bitmap.width
+        val height = bitmap.height
+
+        val ratio = minOf(maxWidth.toFloat() / width, maxHeight.toFloat() / height)
+
+        return if (ratio < 1) {
+            val newWidth = (width * ratio).toInt()
+            val newHeight = (height * ratio).toInt()
+            Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true)
+        } else {
+            bitmap
         }
     }
 
     // 更新用户信息
     fun updateUserInfo(newUserInfo: UserInfo) {
         _userInfo.value = newUserInfo
+        saveUserInfo(newUserInfo)
     }
 
     // 更新昵称
     fun updateNickname(nickname: String) {
-        _userInfo.value = _userInfo.value.copy(nickname = nickname)
+        val newUserInfo = _userInfo.value.copy(nickname = nickname)
+        _userInfo.value = newUserInfo
+        saveUserInfo(newUserInfo)
     }
 
     // 更新宠物品种
     fun updatePetBreed(breed: String) {
-        _userInfo.value = _userInfo.value.copy(petBreed = breed)
+        val newUserInfo = _userInfo.value.copy(petBreed = breed)
+        _userInfo.value = newUserInfo
+        saveUserInfo(newUserInfo)
     }
 
     // 更新宠物年龄
     fun updatePetAge(age: String) {
-        _userInfo.value = _userInfo.value.copy(petAge = age)
+        val newUserInfo = _userInfo.value.copy(petAge = age)
+        _userInfo.value = newUserInfo
+        saveUserInfo(newUserInfo)
     }
 
     // 更新头像（资源ID）
     fun updateAvatar(resourceId: Int) {
-        _userInfo.value = _userInfo.value.copy(
+        val newUserInfo = _userInfo.value.copy(
             avatarResourceId = resourceId,
-            avatarUri = null // 清除URI，使用资源ID
+            avatarUri = null, // 清除URI
+            savedAvatarPath = null // 清除保存的路径
         )
+        _userInfo.value = newUserInfo
+        saveUserInfo(newUserInfo)
+
+        // 删除旧的头像文件
+        deleteOldAvatarFile()
     }
 
-    // 更新头像（URI）
+    // 更新头像（URI）- 同时保存到内部存储
     fun updateAvatarUri(uri: String) {
-        _userInfo.value = _userInfo.value.copy(avatarUri = uri)
+        try {
+            val uriObj = Uri.parse(uri)
+            val savedPath = saveAvatarToInternalStorage(uriObj)
+
+            val newUserInfo = _userInfo.value.copy(
+                avatarUri = uri,
+                savedAvatarPath = savedPath
+            )
+            _userInfo.value = newUserInfo
+            saveUserInfo(newUserInfo)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            // 如果保存失败，仍然更新URI，但可能在重启后失效
+            val newUserInfo = _userInfo.value.copy(avatarUri = uri)
+            _userInfo.value = newUserInfo
+            saveUserInfo(newUserInfo)
+        }
+    }
+
+    // 删除旧的头像文件
+    private fun deleteOldAvatarFile() {
+        try {
+            val avatarFile = File(context.filesDir, AVATAR_FILENAME)
+            if (avatarFile.exists()) {
+                avatarFile.delete()
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     // 获取宠物信息格式化字符串
@@ -80,6 +214,12 @@ class UserInfoManager private constructor() {
 
     // 判断是否使用自定义头像
     fun isUsingCustomAvatar(): Boolean {
-        return _userInfo.value.avatarUri != null
+        return _userInfo.value.savedAvatarPath != null || _userInfo.value.avatarUri != null
+    }
+
+    // 获取头像显示路径（优先使用保存的路径）
+    fun getAvatarDisplayPath(): String? {
+        val userInfo = _userInfo.value
+        return userInfo.savedAvatarPath ?: userInfo.avatarUri
     }
 }
