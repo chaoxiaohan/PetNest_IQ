@@ -56,7 +56,7 @@ fun MainNavigation() {
                 MessageScreen()
             }
             composable(NavigationItem.Profile.route) {
-                ProfileScreen()
+                ProfileScreen(navController = navController)
             }
             // 详细数据界面
             composable(NavigationItem.TemperatureDetail.route) {
@@ -80,6 +80,12 @@ fun MainNavigation() {
             composable(NavigationItem.WaterDetail.route) {
                 DetailScreen(
                     dataType = DataType.WATER,
+                    onBackClick = { navController.popBackStack() }
+                )
+            }
+            // 用户资料编辑页面
+            composable(NavigationItem.UserProfileEdit.route) {
+                UserProfileEditScreen(
                     onBackClick = { navController.popBackStack() }
                 )
             }

@@ -18,6 +18,9 @@ sealed class NavigationItem(
     object HumidityDetail : NavigationItem("humidity_detail", "湿度详情", Icons.Default.WaterDrop)
     object FoodDetail : NavigationItem("food_detail", "食物详情", Icons.Default.Restaurant)
     object WaterDetail : NavigationItem("water_detail", "水量详情", Icons.Default.LocalDrink)
+
+    // 用户资料编辑页面
+    object UserProfileEdit : NavigationItem("user_profile_edit", "编辑资料", Icons.Default.Edit)
 }
 
 val navigationItems = listOf(

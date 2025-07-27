@@ -53,6 +53,10 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended:1.5.4")
     // 添加动态颜色支持（莫奈取色）
     implementation("androidx.compose.material3:material3-window-size-class:1.1.2")
+
+    // 添加Coil库用于图片加载
+    implementation("io.coil-kt:coil-compose:2.5.0")
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

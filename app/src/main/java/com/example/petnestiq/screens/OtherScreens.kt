@@ -1,6 +1,8 @@
 package com.example.petnestiq.screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -14,13 +16,16 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -316,7 +321,9 @@ fun DataScreen() {
 }
 
 @Composable
-fun ProfileScreen() {
+fun ProfileScreen(navController: androidx.navigation.NavController? = null) {
+    val userInfoManager = remember { com.example.petnestiq.data.UserInfoManager.getInstance() }
+    val userInfo by userInfoManager.userInfo.collectAsStateWithLifecycle()
     var showDebugOptions by remember { mutableStateOf(false) }
 
     Column(
@@ -334,29 +341,74 @@ fun ProfileScreen() {
 
         // 用户信息卡片
         Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable {
+                    navController?.navigate(com.example.petnestiq.navigation.NavigationItem.UserProfileEdit.route)
+                },
+            shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surfaceVariant
             ),
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
-            Column(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(20.dp)
+                    .padding(20.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "用户昵称",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "智能宠物窝用户",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                // 左侧头像 - 智能显示逻辑
+                if (userInfo.avatarUri != null) {
+                    // 显示相册选择的头像
+                    coil.compose.AsyncImage(
+                        model = userInfo.avatarUri,
+                        contentDescription = "用户头像",
+                        modifier = Modifier
+                            .size(60.dp)
+                            .clip(CircleShape)
+                            .border(2.dp, MaterialTheme.colorScheme.primary, CircleShape),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    // 显示默认资源头像
+                    Image(
+                        painter = painterResource(id = userInfo.avatarResourceId),
+                        contentDescription = "用户头像",
+                        modifier = Modifier
+                            .size(60.dp)
+                            .clip(CircleShape)
+                            .border(2.dp, MaterialTheme.colorScheme.primary, CircleShape),
+                        contentScale = ContentScale.Crop
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                // 右侧用户信息
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        text = userInfo.nickname,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = userInfoManager.getPetInfoDisplay(),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    )
+                }
+
+                // 右侧箭头图标
+                Icon(
+                    Icons.Default.KeyboardArrowRight,
+                    contentDescription = "编辑",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    modifier = Modifier.size(24.dp)
                 )
             }
         }
@@ -368,12 +420,6 @@ fun ProfileScreen() {
             title = "设备管理",
             subtitle = "管理您的智能宠物窝设备",
             onClick = { /* TODO: 跳转到设备管理 */ }
-        )
-
-        ProfileMenuItem(
-            title = "数据统计",
-            subtitle = "查看宠物活动和环境数据",
-            onClick = { /* TODO: 跳转到数据统计 */ }
         )
 
         ProfileMenuItem(
