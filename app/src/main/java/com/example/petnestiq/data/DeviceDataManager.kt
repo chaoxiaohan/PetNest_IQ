@@ -13,6 +13,10 @@ data class DeviceData(
     val humidity: Float,
     val foodAmount: Float,
     val waterAmount: Float,
+    val ventilationStatus: Boolean = false,
+    val disinfectionStatus: Boolean = false,
+    val heatingStatus: Boolean = false,
+    val targetTemperature: Float = 25f,
     val lastUpdateTime: String = getCurrentTime()
 )
 
@@ -81,6 +85,35 @@ class DeviceDataManager private constructor() {
     fun updateWaterAmount(amount: Float) {
         _deviceData.value = _deviceData.value.copy(
             waterAmount = amount,
+            lastUpdateTime = getCurrentTime()
+        )
+    }
+
+    // 更新设备状态
+    fun updateVentilationStatus(status: Boolean) {
+        _deviceData.value = _deviceData.value.copy(
+            ventilationStatus = status,
+            lastUpdateTime = getCurrentTime()
+        )
+    }
+
+    fun updateDisinfectionStatus(status: Boolean) {
+        _deviceData.value = _deviceData.value.copy(
+            disinfectionStatus = status,
+            lastUpdateTime = getCurrentTime()
+        )
+    }
+
+    fun updateHeatingStatus(status: Boolean) {
+        _deviceData.value = _deviceData.value.copy(
+            heatingStatus = status,
+            lastUpdateTime = getCurrentTime()
+        )
+    }
+
+    fun updateTargetTemperature(temperature: Float) {
+        _deviceData.value = _deviceData.value.copy(
+            targetTemperature = temperature,
             lastUpdateTime = getCurrentTime()
         )
     }

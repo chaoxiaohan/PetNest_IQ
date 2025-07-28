@@ -31,6 +31,7 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -42,6 +43,10 @@ import com.example.petnestiq.R
 import com.example.petnestiq.navigation.NavigationItem
 import com.example.petnestiq.data.DeviceDataManager
 import com.example.petnestiq.data.DataType
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlin.math.sin
 import kotlin.random.Random
 
@@ -92,17 +97,18 @@ fun DeviceScreen(navController: NavController? = null) {
     val deviceData by deviceDataManager.deviceData.collectAsStateWithLifecycle()
     val connectionStatus by deviceDataManager.connectionStatus.collectAsStateWithLifecycle()
 
-    var ventilationEnabled by remember { mutableStateOf(true) }
-    var disinfectionEnabled by remember { mutableStateOf(false) }
-    var heatingEnabled by remember { mutableStateOf(false) }
-    var targetTemperature by remember { mutableStateOf(25) }
+    // 获取Context
+    val context = LocalContext.current
+
+    // 使用设备数据中的状态，而不是本地状态
+    // 当UI状态变化时，更新DeviceDataManager，进而触发MQTT指令下发
 
     val scrollState = rememberScrollState()
 
     // 模拟数据更新（每30秒更新一次）
     LaunchedEffect(Unit) {
         while (true) {
-            kotlinx.coroutines.delay(30000) // 30秒
+            delay(30000) // 30秒
             deviceDataManager.simulateDataUpdate()
         }
     }
@@ -124,7 +130,22 @@ fun DeviceScreen(navController: NavController? = null) {
             Card(
                 modifier = Modifier
                     .fillMaxWidth(0.4f)
-                    .padding(bottom = 12.dp),
+                    .padding(bottom = 12.dp)
+                    .clickable {
+                        // 点击连接状态卡片时尝试重新连接MQTT
+                        val mqttService = com.example.petnestiq.service.HuaweiIoTDAMqttService.getInstance()
+                        if (connectionStatus == "MQTT连接") {
+                            // 如果已连接，先断开再重连
+                            mqttService.disconnect()
+                            CoroutineScope(Dispatchers.Main).launch {
+                                delay(1000) // 等待1秒
+                                mqttService.connect(context)
+                            }
+                        } else {
+                            // 如果未连接，直接尝试连接
+                            mqttService.connect(context)
+                        }
+                    },
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceVariant
@@ -139,9 +160,11 @@ fun DeviceScreen(navController: NavController? = null) {
                 ) {
                     // 状态指示点
                     val indicatorColor = when (connectionStatus) {
-                        "Connected" -> Color(0xFF4CAF50)
-                        "Disconnected" -> Color(0xFFF44336)
-                        else -> Color(0xFFF44336)
+                        "MQTT连接" -> Color(0xFF4CAF50)  // 绿色表示MQTT连接成功
+                        "连接中..." -> Color(0xFFFF9800)  // 橙色表示连接中
+                        "连接失败", "连接断开" -> Color(0xFFF44336)  // 红色表示连接失败或断开
+                        null -> Color(0xFF9E9E9E)  // 灰色表示未连接
+                        else -> Color(0xFF9E9E9E)
                     }
 
                     Box(
@@ -152,7 +175,7 @@ fun DeviceScreen(navController: NavController? = null) {
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "连接状态：${connectionStatus ?: "null"}",
+                        text = connectionStatus ?: "未连接",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -257,24 +280,24 @@ fun DeviceScreen(navController: NavController? = null) {
             ) {
                 SwitchCard(
                     label = "通风开关",
-                    checked = ventilationEnabled,
-                    onCheckedChange = { ventilationEnabled = it },
+                    checked = deviceData.ventilationStatus,
+                    onCheckedChange = { deviceDataManager.updateVentilationStatus(it) },
                     modifier = Modifier.weight(1f)
                 )
                 SwitchCard(
                     label = "消毒开关",
-                    checked = disinfectionEnabled,
-                    onCheckedChange = { disinfectionEnabled = it },
+                    checked = deviceData.disinfectionStatus,
+                    onCheckedChange = { deviceDataManager.updateDisinfectionStatus(it) },
                     modifier = Modifier.weight(1f)
                 )
             }
 
             // 第四行：加热状态（独占一行）
             HeatingCard(
-                enabled = heatingEnabled,
-                onEnabledChange = { heatingEnabled = it },
-                targetTemperature = targetTemperature,
-                onTemperatureChange = { targetTemperature = it },
+                enabled = deviceData.heatingStatus,
+                onEnabledChange = { deviceDataManager.updateHeatingStatus(it) },
+                targetTemperature = deviceData.targetTemperature.toInt(),
+                onTemperatureChange = { deviceDataManager.updateTargetTemperature(it.toFloat()) },
                 modifier = Modifier
             )
 

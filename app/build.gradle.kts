@@ -60,6 +60,10 @@ dependencies {
     // 添加Gson用于JSON序列化
     implementation("com.google.code.gson:gson:2.10.1")
 
+    // 添加MQTT客户端
+    implementation("org.eclipse.paho:org.eclipse.paho.client.mqttv3:1.2.5")
+    implementation("org.eclipse.paho:org.eclipse.paho.android.service:1.1.1")
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

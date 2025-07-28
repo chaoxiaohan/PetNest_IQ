@@ -17,6 +17,8 @@ import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -27,6 +29,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -39,7 +42,9 @@ import com.example.petnestiq.R
 import com.example.petnestiq.data.Message
 import com.example.petnestiq.data.MessageType
 import com.example.petnestiq.data.MessagePriority
+import com.example.petnestiq.data.DeviceDataManager
 import com.example.petnestiq.service.MessageManager
+import com.example.petnestiq.service.HuaweiIoTDAMqttService
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -924,19 +929,232 @@ fun SystemDebugPanel() {
 
 @Composable
 fun NetworkTestPanel() {
+    val mqttService = remember { HuaweiIoTDAMqttService.getInstance() }
+    val deviceDataManager = remember { DeviceDataManager.getInstance() }
+
+    // 收集MQTT调试数据
+    val debugMessages by mqttService.debugMessages.collectAsStateWithLifecycle()
+    val lastReceivedData by mqttService.lastReceivedData.collectAsStateWithLifecycle()
+    val lastSentCommand by mqttService.lastSentCommand.collectAsStateWithLifecycle()
+    val connectionStatus by deviceDataManager.connectionStatus.collectAsStateWithLifecycle()
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
-            Text(
-                text = "网络测试",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "网络调试",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+
+                Row {
+                    // 清除日志按钮
+                    IconButton(
+                        onClick = { mqttService.clearDebugMessages() },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Clear,
+                            contentDescription = "清除日志",
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+
+                    // 刷新按钮
+                    IconButton(
+                        onClick = { mqttService.getDeviceShadow() },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Refresh,
+                            contentDescription = "刷新数据",
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+            }
         }
 
+        // MQTT连接状态
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                )
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "MQTT连接状态",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        // 状态指示器
+                        val indicatorColor = when (connectionStatus) {
+                            "MQTT连接" -> Color(0xFF4CAF50)
+                            "连接中..." -> Color(0xFFFF9800)
+                            "连接失败", "连接断开" -> Color(0xFFF44336)
+                            else -> Color(0xFF9E9E9E)
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .size(10.dp)
+                                .background(
+                                    color = indicatorColor,
+                                    shape = RoundedCornerShape(5.dp)
+                                )
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Text(
+                        text = "状态: ${connectionStatus ?: "未连接"}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+
+                    mqttService.getMqttConfig()?.let { config ->
+                        Text(
+                            text = "设备ID: ${config.deviceId}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                        )
+                        Text(
+                            text = "服务器: ${config.serverUri}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                        )
+                    }
+
+                    Text(
+                        text = "连接状态: ${if (mqttService.isConnected()) "已连接" else "未连接"}",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Medium,
+                        color = if (mqttService.isConnected()) Color(0xFF4CAF50) else Color(0xFFF44336)
+                    )
+                }
+            }
+        }
+
+        // 最后接收的数据
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(12.dp)
+                ) {
+                    Text(
+                        text = "最后接收的数据",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    lastReceivedData?.let { data ->
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surface
+                            )
+                        ) {
+                            Text(
+                                text = data,
+                                modifier = Modifier.padding(8.dp),
+                                style = MaterialTheme.typography.bodySmall,
+                                fontFamily = FontFamily.Monospace,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontSize = 10.sp
+                            )
+                        }
+                    } ?: run {
+                        Text(
+                            text = "暂无数据",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.6f)
+                        )
+                    }
+                }
+            }
+        }
+
+        // 最后发送的指令
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(12.dp)
+                ) {
+                    Text(
+                        text = "最后发送的指令",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer
+                    )
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    val commandText = lastSentCommand
+                    if (commandText != null) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surface
+                            )
+                        ) {
+                            Text(
+                                text = commandText,
+                                modifier = Modifier.padding(8.dp),
+                                style = MaterialTheme.typography.bodySmall,
+                                fontFamily = FontFamily.Monospace,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontSize = 10.sp
+                            )
+                        }
+                    } else {
+                        Text(
+                            text = "暂无指令",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.6f)
+                        )
+                    }
+                }
+            }
+        }
+
+        // 调试日志
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -945,29 +1163,62 @@ fun NetworkTestPanel() {
                 )
             ) {
                 Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp)
+                    modifier = Modifier.padding(12.dp)
                 ) {
                     Text(
-                        text = "网络状态",
+                        text = "调试日志 (${debugMessages.size}条)",
                         style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Medium
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text("连接状态: 已连接", style = MaterialTheme.typography.bodySmall)
-                    Text("网络类型: WiFi", style = MaterialTheme.typography.bodySmall)
-                    Text("延迟: 50ms", style = MaterialTheme.typography.bodySmall)
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    if (debugMessages.isNotEmpty()) {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(200.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = Color.Black
+                            )
+                        ) {
+                            LazyColumn(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(8.dp),
+                                reverseLayout = false
+                            ) {
+                                items(debugMessages) { message ->
+                                    Text(
+                                        text = message,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontFamily = FontFamily.Monospace,
+                                        color = Color.Green,
+                                        fontSize = 9.sp,
+                                        modifier = Modifier.padding(vertical = 1.dp)
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        Text(
+                            text = "暂无调试日志",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        )
+                    }
                 }
             }
         }
 
+        // 网络测试按钮
         item {
             Button(
-                onClick = { /* TODO: 网络测试 */ },
+                onClick = { mqttService.getDeviceShadow() },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("开始网络测试")
+                Text("手动获取设备数据")
             }
         }
     }

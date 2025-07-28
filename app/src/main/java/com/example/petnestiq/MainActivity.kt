@@ -17,9 +17,13 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.core.content.ContextCompat
 import com.example.petnestiq.navigation.MainNavigation
 import com.example.petnestiq.service.NotificationService
+import com.example.petnestiq.service.HuaweiIoTDAMqttService
 import com.example.petnestiq.ui.theme.PetNestIQTheme
 
 class MainActivity : ComponentActivity() {
+
+    // MQTT服务实例
+    private val mqttService = HuaweiIoTDAMqttService.getInstance()
 
     // 通知权限请求启动器
     private val requestPermissionLauncher = registerForActivityResult(
@@ -49,6 +53,9 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        // 初始化并连接MQTT服务
+        initializeMqttService()
+
         enableEdgeToEdge()
         setContent {
             PetNestIQTheme(
@@ -63,6 +70,29 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    // 初始化并连接MQTT服务
+    private fun initializeMqttService() {
+        // 配置华为云IOTDA MQTT连接参数
+        // TODO: 请根据实际情况修改以下配置信息
+        val mqttConfig = HuaweiIoTDAMqttService.MqttConfig(
+            serverUri = "ssl://your-server.iot-mqtts.cn-north-4.myhuaweicloud.com:8883", // 华为云IOTDA MQTT服务器地址
+            deviceId = "your_device_id",              // 设备ID
+            deviceSecret = "your_device_secret"       // 设备密钥
+        )
+
+        // 配置MQTT服务
+        mqttService.configure(mqttConfig)
+
+        // 尝试连接MQTT服务
+        mqttService.connect(this)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        // 清理MQTT服务资源
+        mqttService.cleanup()
     }
 }
 
