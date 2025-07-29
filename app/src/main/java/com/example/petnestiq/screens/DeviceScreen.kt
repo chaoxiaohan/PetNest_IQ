@@ -105,13 +105,13 @@ fun DeviceScreen(navController: NavController? = null) {
 
     val scrollState = rememberScrollState()
 
-    // 模拟数据更新（每30秒更新一次）
-    LaunchedEffect(Unit) {
-        while (true) {
-            delay(30000) // 30秒
-            deviceDataManager.simulateDataUpdate()
-        }
-    }
+    // 移除模拟数据更新，使用MQTT接收到的真实数据
+    // LaunchedEffect(Unit) {
+    //     while (true) {
+    //         delay(30000) // 30秒
+    //         deviceDataManager.simulateDataUpdate()
+    //     }
+    // }
 
     Column(
         modifier = Modifier
@@ -377,7 +377,10 @@ fun SwitchCard(
         modifier = modifier.height(80.dp),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.tertiaryContainer
+            containerColor = if (checked)
+                MaterialTheme.colorScheme.tertiaryContainer
+            else
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)  // 灰色状态
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
@@ -391,7 +394,10 @@ fun SwitchCard(
             Text(
                 text = label,
                 style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onTertiaryContainer,
+                color = if (checked)
+                    MaterialTheme.colorScheme.onTertiaryContainer
+                else
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),  // 灰色文字
                 fontWeight = FontWeight.Medium
             )
             Switch(
@@ -399,7 +405,9 @@ fun SwitchCard(
                 onCheckedChange = onCheckedChange,
                 colors = SwitchDefaults.colors(
                     checkedThumbColor = MaterialTheme.colorScheme.primary,
-                    checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
+                    checkedTrackColor = MaterialTheme.colorScheme.primaryContainer,
+                    uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                    uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
                 )
             )
         }

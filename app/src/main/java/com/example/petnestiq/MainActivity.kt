@@ -72,14 +72,17 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // 初始化并连接MQTT服务
+    // 初始化并连接MQTT服务,HuaweiioT文件222行更改service_id
     private fun initializeMqttService() {
         // 配置华为云IOTDA MQTT连接参数
-        // TODO: 请根据实际情况修改以下配置信息
         val mqttConfig = HuaweiIoTDAMqttService.MqttConfig(
-            serverUri = "ssl://your-server.iot-mqtts.cn-north-4.myhuaweicloud.com:8883", // 华为云IOTDA MQTT服务器地址
-            deviceId = "your_device_id",              // 设备ID
-            deviceSecret = "your_device_secret"       // 设备密钥
+            serverUri = "ssl://e35491cb0c.st1.iotda-device.cn-north-4.myhuaweicloud.com:8883",
+            deviceId = "688879e2d582f20018403921_text1",
+            deviceSecret = "",  // 不需要密钥，直接使用提供的密码
+            clientId = "688879e2d582f20018403921_text1_0_0_2025072907",
+            username = "688879e2d582f20018403921_text1",
+            password = "bdd6a2f87eab3e9dd81325957547fa3b5b566f1abfbdb9850249b3b4984f277e",
+            port = 8883
         )
 
         // 配置MQTT服务

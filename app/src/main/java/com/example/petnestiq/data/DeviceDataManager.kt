@@ -33,7 +33,7 @@ class DeviceDataManager private constructor() {
     private val _deviceData = MutableStateFlow(
         DeviceData(
             temperature = 25f,
-            humidity = 60f,
+            humidity = 70f,
             foodAmount = 500f,
             waterAmount = 500f
         )

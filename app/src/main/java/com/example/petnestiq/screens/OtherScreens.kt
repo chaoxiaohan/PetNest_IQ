@@ -1126,8 +1126,7 @@ fun NetworkTestPanel() {
 
                     Spacer(modifier = Modifier.height(6.dp))
 
-                    val commandText = lastSentCommand
-                    if (commandText != null) {
+                    lastSentCommand?.let { commandText ->
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             colors = CardDefaults.cardColors(
@@ -1143,7 +1142,7 @@ fun NetworkTestPanel() {
                                 fontSize = 10.sp
                             )
                         }
-                    } else {
+                    } ?: run {
                         Text(
                             text = "暂无指令",
                             style = MaterialTheme.typography.bodySmall,
@@ -1219,6 +1218,78 @@ fun NetworkTestPanel() {
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("手动获取设备数据")
+            }
+        }
+
+
+        // 设备影子为空的提示信息
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color(0xFFFF9800).copy(alpha = 0.1f)
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp)
+                ) {
+                    Text(
+                        text = "⚠️ 设备影子为空",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFFF9800)
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = "可能的原因：",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium
+                    )
+
+                    val reasons = listOf(
+                        "1. 设备端程序未运行或未连接网络",
+                        "2. 设备还没有向华为云IoTDA平台上报过数据",
+                        "3. 设备ID或产品ID配置错误",
+                        "4. 设备端使用的Topic与应用端不匹配",
+                        "5. 设备端认证失败"
+                    )
+
+                    reasons.forEach { reason ->
+                        Text(
+                            text = reason,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(start = 8.dp, top = 2.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = "建议解决方案：",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium
+                    )
+
+                    val solutions = listOf(
+                        "1. 检查设备端程序是否正常运行",
+                        "2. 确认设备端网络连接正常",
+                        "3. 验证设备ID和密钥是否正确",
+                        "4. 检查设备端是否成功连接到MQTT服务器",
+                        "5. 确认设备端正在向正确的Topic发送数据"
+                    )
+
+                    solutions.forEach { solution ->
+                        Text(
+                            text = solution,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(start = 8.dp, top = 2.dp)
+                        )
+                    }
+                }
             }
         }
     }
