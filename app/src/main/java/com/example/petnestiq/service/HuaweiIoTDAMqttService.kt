@@ -2,6 +2,7 @@ package com.example.petnestiq.service
 
 import android.content.Context
 import android.util.Log
+import android.widget.Toast
 import com.example.petnestiq.data.DeviceData
 import com.example.petnestiq.data.DeviceDataManager
 import com.google.gson.Gson
@@ -71,6 +72,12 @@ class HuaweiIoTDAMqttService private constructor() {
     // 上一次发送的设备状态，用于判断是否需要下发指令
     private val lastSentStates = AtomicReference<DeviceData?>(null)
 
+    // 添加上下文引用用于显示Toast
+    private var appContext: Context? = null
+
+    // 命令响应回调映射
+    private val commandCallbacks = mutableMapOf<String, (Boolean, String?) -> Unit>()
+
     /**
      * 配置MQTT连接信息
      */
@@ -87,6 +94,8 @@ class HuaweiIoTDAMqttService private constructor() {
             deviceDataManager.updateConnectionStatus("配置错误")
             return
         }
+
+        appContext = context // 保存上下文引用
 
         serviceScope.launch {
             try {
@@ -229,7 +238,7 @@ class HuaweiIoTDAMqttService private constructor() {
             mqttClient?.publish(topic, mqttMessage)
             Log.d(TAG, "发送设备影子获取请求: $topic")
             Log.d(TAG, "请求消息内容: ${message.toString()}")
-            addDebugMessage("发送设备影子请求: ${message.toString()}")
+            addDebugMessage("发送�������备影子请求: ${message.toString()}")
 
         } catch (e: Exception) {
             Log.e(TAG, "获取设备影子失败", e)
@@ -327,6 +336,9 @@ class HuaweiIoTDAMqttService private constructor() {
                         }
                         topic?.contains("events/up") == true -> {
                             parseDeviceEvent(payload)
+                        }
+                        topic?.contains("commands/response") == true -> {
+                            parseCommandResponse(payload)
                         }
                         topic?.contains("/data") == true -> {
                             parseGenericData(payload)
@@ -651,7 +663,7 @@ class HuaweiIoTDAMqttService private constructor() {
                         deviceDataManager.updateVentilationStatus(ventilation)
                         Log.d(TAG, "更新通风状态: $ventilation")
                     } catch (e: Exception) {
-                        Log.w(TAG, "解析通风状态失败: ${element.asString}")
+                        Log.w(TAG, "��析通风状态失败: ${element.asString}")
                     }
                 }
 
@@ -834,7 +846,7 @@ class HuaweiIoTDAMqttService private constructor() {
     }
 
     /**
-     * 清除调试消息
+     * 清������试消息
      */
     fun clearDebugMessages() {
         _debugMessages.value = emptyList()
@@ -851,5 +863,512 @@ class HuaweiIoTDAMqttService private constructor() {
     fun cleanup() {
         serviceScope.cancel()
         disconnect()
+    }
+
+    /**
+     * 下发设备消息 - 根据华为云IoTDA平台标准
+     * 参考文档: https://support.huaweicloud.com/api-iothub/iot_06_v5_0059.html
+     */
+    fun sendDeviceMessage(
+        ventilation: Int? = null,
+        disinfection: Int? = null,
+        heating: Int? = null,
+        targetTemperature: Int? = null,
+        onResult: ((Boolean, String?) -> Unit)? = null
+    ) {
+        val config = currentConfig ?: run {
+            val errorMsg = "MQTT配置未设置"
+            Log.e(TAG, errorMsg)
+            onResult?.invoke(false, errorMsg)
+            showToast(errorMsg)
+            return
+        }
+
+        if (!isConnected || mqttClient?.isConnected != true) {
+            val errorMsg = "MQTT未连接，无法发送消息"
+            Log.w(TAG, errorMsg)
+            onResult?.invoke(false, errorMsg)
+            showToast(errorMsg)
+            return
+        }
+
+        // 检查参数有效性 - 至少要有一个控制参数
+        if (ventilation == null && disinfection == null && heating == null && targetTemperature == null) {
+            val errorMsg = "至少需要设置一个控制参数"
+            Log.w(TAG, errorMsg)
+            onResult?.invoke(false, errorMsg)
+            return
+        }
+
+        // 检查状态冲突
+        val hasConflict = checkDeviceStateConflict(
+            ventilation == 1,
+            disinfection == 1,
+            heating == 1
+        )
+        if (hasConflict) {
+            val errorMsg = "设备状态冲突，无法执行操作"
+            Log.w(TAG, "⚠️ $errorMsg")
+            onResult?.invoke(false, errorMsg)
+            showToast(errorMsg)
+            return
+        }
+
+        try {
+            val requestId = generateRequestId()
+            val topic = "\$oc/devices/${config.deviceId}/sys/commands/request_id=$requestId"
+
+            // 构建控制指令 - 只包含控制参数，不包含状态数据
+            val paras = JsonObject()
+
+            // 只添加需要控制的参数
+            ventilation?.let { paras.addProperty("ventilation", it) }
+            disinfection?.let { paras.addProperty("disinfection", it) }
+            heating?.let { paras.addProperty("heating", it) }
+            targetTemperature?.let { paras.addProperty("target_temperature", it) }
+
+            val command = JsonObject().apply {
+                addProperty("object_device_id", config.deviceId)
+                addProperty("service_id", "ControlService")
+                add("paras", paras)
+            }
+
+            val commandJson = command.toString()
+            val mqttMessage = MqttMessage(commandJson.toByteArray()).apply {
+                qos = 1
+            }
+
+            // 注册回调
+            onResult?.let { callback ->
+                commandCallbacks[requestId] = callback
+
+                // 设置超时处理
+                serviceScope.launch {
+                    delay(10000) // 10秒超时
+                    if (commandCallbacks.containsKey(requestId)) {
+                        commandCallbacks.remove(requestId)
+                        val timeoutMsg = "指���发送超时"
+                        callback(false, timeoutMsg)
+                        showToast(timeoutMsg)
+                    }
+                }
+            }
+
+            mqttClient?.publish(topic, mqttMessage)
+
+            // 记录日志
+            val commandParams = mutableListOf<String>()
+            ventilation?.let { commandParams.add("通风开关=${if (it == 1) "开" else "关"}") }
+            disinfection?.let { commandParams.add("消毒开关=${if (it == 1) "开" else "关"}") }
+            heating?.let { commandParams.add("加热开关=${if (it == 1) "开" else "关"}") }
+            targetTemperature?.let { commandParams.add("设定温度=${it}°C") }
+
+            val commandDescription = commandParams.joinToString(", ")
+            Log.d(TAG, "✅ 发送控制指令: $commandDescription")
+            addDebugMessage("✅ 发送控制指令: $commandDescription")
+            addDebugMessage("📤 指令内容: $commandJson")
+
+            _lastSentCommand.value = commandJson
+
+        } catch (e: Exception) {
+            val errorMsg = "发送控制指令失败: ${e.message}"
+            Log.e(TAG, "❌ $errorMsg", e)
+            addDebugMessage("❌ $errorMsg")
+            onResult?.invoke(false, errorMsg)
+            showToast(errorMsg)
+        }
+    }
+
+    /**
+     * 发送通风控制指令
+     */
+    fun sendVentilationCommand(enabled: Boolean, callback: (Boolean, String?) -> Unit) {
+        try {
+            sendDeviceCommand("ventilation", if (enabled) 1 else 0)
+            callback(true, null)
+            Log.d(TAG, "发送通风控制指令: $enabled")
+        } catch (e: Exception) {
+            Log.e(TAG, "发送通风控制指令失败", e)
+            callback(false, e.message)
+        }
+    }
+
+    /**
+     * 发送消毒控制指令
+     */
+    fun sendDisinfectionCommand(enabled: Boolean, callback: (Boolean, String?) -> Unit) {
+        try {
+            sendDeviceCommand("disinfection", if (enabled) 1 else 0)
+            callback(true, null)
+            Log.d(TAG, "发送消毒控制指令: $enabled")
+        } catch (e: Exception) {
+            Log.e(TAG, "发送消毒控制指令失败", e)
+            callback(false, e.message)
+        }
+    }
+
+    /**
+     * 发送加热控制指令
+     */
+    fun sendHeatingCommand(enabled: Boolean, callback: (Boolean, String?) -> Unit) {
+        try {
+            sendDeviceCommand("heating", if (enabled) 1 else 0)
+            callback(true, null)
+            Log.d(TAG, "发送加热控制指令: $enabled")
+        } catch (e: Exception) {
+            Log.e(TAG, "发送加热控制指令失败", e)
+            callback(false, e.message)
+        }
+    }
+
+    /**
+     * 发送目标温度设置指令
+     */
+    fun sendTargetTemperatureCommand(temperature: Int, callback: (Boolean, String?) -> Unit) {
+        try {
+            sendDeviceCommand("target_temperature", temperature)
+            callback(true, null)
+            Log.d(TAG, "发送目标温度设置指令: $temperature")
+        } catch (e: Exception) {
+            Log.e(TAG, "发送目标温度设置指令失败", e)
+            callback(false, e.message)
+        }
+    }
+
+    /**
+     * 批量控制设备状态 - 带结果回调
+     */
+    fun controlDeviceState(
+        ventilation: Boolean? = null,
+        disinfection: Boolean? = null,
+        heating: Boolean? = null,
+        targetTemperature: Int? = null,
+        onResult: ((Boolean, String?) -> Unit)? = null
+    ) {
+        // 转换为数值参数
+        val ventilationValue = ventilation?.let { if (it) 1 else 0 }
+        val disinfectionValue = disinfection?.let { if (it) 1 else 0 }
+        val heatingValue = heating?.let { if (it) 1 else 0 }
+
+        Log.d(TAG, "批量控制设备状态")
+        sendDeviceMessage(
+            ventilation = ventilationValue,
+            disinfection = disinfectionValue,
+            heating = heatingValue,
+            targetTemperature = targetTemperature,
+            onResult = onResult
+        )
+    }
+
+    /**
+     * 上报设备控制状态到MQTT服务器
+     * Topic: $oc/devices/{device_id}/sys/messages/up
+     */
+    fun reportControlStatus(
+        ventilation: Boolean,
+        disinfection: Boolean,
+        heating: Boolean,
+        targetTemperature: Int,
+        onResult: ((Boolean, String?) -> Unit)? = null
+    ) {
+        val config = currentConfig ?: run {
+            val errorMsg = "MQTT配置未设置"
+            Log.e(TAG, errorMsg)
+            onResult?.invoke(false, errorMsg)
+            showToast(errorMsg)
+            return
+        }
+
+        if (!isConnected || mqttClient?.isConnected != true) {
+            val errorMsg = "MQTT未连��，无法上报数据"
+            Log.w(TAG, errorMsg)
+            onResult?.invoke(false, errorMsg)
+            showToast(errorMsg)
+            return
+        }
+
+        try {
+            val topic = "\$oc/devices/${config.deviceId}/sys/messages/up"
+
+            // 获取当前设备数据以包含完整的状态信息
+            val currentData = deviceDataManager.deviceData.value
+
+            // 构建符合华为云IoTDA标准的消息格式
+            val properties = JsonObject().apply {
+                // 包含传感器数据
+                addProperty("temperature", currentData.temperature)
+                addProperty("humidity", currentData.humidity)
+                addProperty("food_amount", currentData.foodAmount)
+                addProperty("water_amount", currentData.waterAmount)
+
+                // 添加控制状态
+                addProperty("ventilation_status", ventilation)
+                addProperty("disinfection_status", disinfection)
+                addProperty("heating_status", heating)
+                addProperty("target_temperature", targetTemperature)
+            }
+
+            val service = JsonObject().apply {
+                addProperty("service_id", "dataText")
+                add("properties", properties)
+                addProperty("eventTime", SimpleDateFormat("yyyyMMdd'T'HHmmss'Z'", Locale.getDefault()).format(Date()))
+            }
+
+            val services = com.google.gson.JsonArray().apply {
+                add(service)
+            }
+
+            val message = JsonObject().apply {
+                add("services", services)
+            }
+
+            val messageJson = message.toString()
+            val mqttMessage = MqttMessage(messageJson.toByteArray()).apply {
+                qos = 1
+            }
+
+            mqttClient?.publish(topic, mqttMessage)
+
+            // 记录日志
+            val statusDescription = "通风=${if (ventilation) "开" else "关"}, " +
+                    "消毒=${if (disinfection) "开" else "关"}, " +
+                    "加热=${if (heating) "开" else "关"}, " +
+                    "目标温度=${targetTemperature}°C"
+
+            Log.d(TAG, "✅ 上报控制状态: $statusDescription")
+            addDebugMessage("✅ 上报控制状态: $statusDescription")
+            addDebugMessage("📤 上报数据: $messageJson")
+
+            _lastSentCommand.value = messageJson
+
+            // 立即调用成功回调（因为上报不需要设备响应）
+            onResult?.invoke(true, "控制状态上报成功")
+            showToast("控制状态上报成功")
+
+        } catch (e: Exception) {
+            val errorMsg = "上报控制状态失败: ${e.message}"
+            Log.e(TAG, "❌ $errorMsg", e)
+            addDebugMessage("�� $errorMsg")
+            onResult?.invoke(false, errorMsg)
+            showToast(errorMsg)
+        }
+    }
+
+    /**
+     * 上报通风开关状态
+     */
+    fun reportVentilationStatus(enabled: Boolean, onResult: ((Boolean, String?) -> Unit)? = null) {
+        Log.d(TAG, "上报通风开关状态: ${if (enabled) "开启" else "关闭"}")
+
+        // 获取当前其他控制状态
+        val currentData = deviceDataManager.deviceData.value
+        val currentDisinfection = currentData.disinfectionStatus ?: false
+        val currentHeating = currentData.heatingStatus ?: false
+        val currentTargetTemp = currentData.targetTemperature?.toInt() ?: 25
+
+        reportControlStatus(
+            ventilation = enabled,
+            disinfection = currentDisinfection,
+            heating = currentHeating,
+            targetTemperature = currentTargetTemp,
+            onResult = onResult
+        )
+    }
+
+    /**
+     * 上报消毒开关状态
+     */
+    fun reportDisinfectionStatus(enabled: Boolean, onResult: ((Boolean, String?) -> Unit)? = null) {
+        Log.d(TAG, "上报消毒开关状态: ${if (enabled) "开启" else "关闭"}")
+
+        // 获取当前其他控制状态
+        val currentData = deviceDataManager.deviceData.value
+        val currentVentilation = currentData.ventilationStatus ?: false
+        val currentHeating = currentData.heatingStatus ?: false
+        val currentTargetTemp = currentData.targetTemperature?.toInt() ?: 25
+
+        reportControlStatus(
+            ventilation = currentVentilation,
+            disinfection = enabled,
+            heating = currentHeating,
+            targetTemperature = currentTargetTemp,
+            onResult = onResult
+        )
+    }
+
+    /**
+     * 上报加热开关状态
+     */
+    fun reportHeatingStatus(enabled: Boolean, onResult: ((Boolean, String?) -> Unit)? = null) {
+        Log.d(TAG, "上报加热开关状态: ${if (enabled) "开启" else "关闭"}")
+
+        // 获取当前其他控制状态
+        val currentData = deviceDataManager.deviceData.value
+        val currentVentilation = currentData.ventilationStatus ?: false
+        val currentDisinfection = currentData.disinfectionStatus ?: false
+        val currentTargetTemp = currentData.targetTemperature?.toInt() ?: 25
+
+        reportControlStatus(
+            ventilation = currentVentilation,
+            disinfection = currentDisinfection,
+            heating = enabled,
+            targetTemperature = currentTargetTemp,
+            onResult = onResult
+        )
+    }
+
+    /**
+     * 上报目标温度设置
+     */
+    fun reportTargetTemperature(temperature: Int, onResult: ((Boolean, String?) -> Unit)? = null) {
+        Log.d(TAG, "上报目标温度设置: ${temperature}°C")
+
+        // 获取当前其他控制状态
+        val currentData = deviceDataManager.deviceData.value
+        val currentVentilation = currentData.ventilationStatus ?: false
+        val currentDisinfection = currentData.disinfectionStatus ?: false
+        val currentHeating = currentData.heatingStatus ?: false
+
+        reportControlStatus(
+            ventilation = currentVentilation,
+            disinfection = currentDisinfection,
+            heating = currentHeating,
+            targetTemperature = temperature,
+            onResult = onResult
+        )
+    }
+
+    /**
+     * 批量上报设备控制状态（带状态冲突检查）
+     */
+    fun reportDeviceControlState(
+        ventilation: Boolean? = null,
+        disinfection: Boolean? = null,
+        heating: Boolean? = null,
+        targetTemperature: Int? = null,
+        onResult: ((Boolean, String?) -> Unit)? = null
+    ) {
+        // 获取当前状态作为默认值
+        val currentData = deviceDataManager.deviceData.value
+        val finalVentilation = ventilation ?: currentData.ventilationStatus ?: false
+        val finalDisinfection = disinfection ?: currentData.disinfectionStatus ?: false
+        val finalHeating = heating ?: currentData.heatingStatus ?: false
+        val finalTargetTemp = targetTemperature ?: currentData.targetTemperature?.toInt() ?: 25
+
+        // 检查状态冲突
+        val hasConflict = checkDeviceStateConflict(finalVentilation, finalDisinfection, finalHeating)
+        if (hasConflict) {
+            val errorMsg = "设备状态冲突，无法上报"
+            Log.w(TAG, "⚠️ $errorMsg")
+            onResult?.invoke(false, errorMsg)
+            showToast(errorMsg)
+            return
+        }
+
+        Log.d(TAG, "批量上报设备控制状态")
+        reportControlStatus(
+            ventilation = finalVentilation,
+            disinfection = finalDisinfection,
+            heating = finalHeating,
+            targetTemperature = finalTargetTemp,
+            onResult = onResult
+        )
+    }
+
+    /**
+     * 解析命令响应
+     */
+    private fun parseCommandResponse(payload: String) {
+        try {
+            Log.d(TAG, "开始解析命令响应: $payload")
+            addDebugMessage("解析命令响应: $payload")
+
+            val json = gson.fromJson(payload, JsonObject::class.java)
+
+            // 提取请求ID和响应结果
+            val requestId = json.get("id")?.asString
+            val resultCode = json.get("result_code")?.asInt ?: -1
+            val responseMsg = json.get("response_detail")?.asString
+
+            Log.d(TAG, "命令响应 - requestId: $requestId, resultCode: $resultCode, response: $responseMsg")
+
+            requestId?.let { id ->
+                commandCallbacks[id]?.let { callback ->
+                    commandCallbacks.remove(id)
+
+                    when (resultCode) {
+                        0 -> {
+                            // 命令执行成功
+                            val successMsg = "设备控制成功"
+                            Log.d(TAG, "✅ $successMsg")
+                            addDebugMessage("✅ $successMsg")
+                            callback(true, successMsg)
+                            showToast(successMsg)
+                        }
+                        else -> {
+                            // 命令执行失败
+                            val errorMsg = responseMsg ?: "设备控制失败，错误码: $resultCode"
+                            Log.w(TAG, "❌ $errorMsg")
+                            addDebugMessage("❌ $errorMsg")
+                            callback(false, errorMsg)
+                            showToast(errorMsg)
+                        }
+                    }
+                }
+            }
+
+            // 如果没有找到对应的回调，说明可能是其他类型的响应
+            if (requestId == null || !commandCallbacks.containsKey(requestId)) {
+                Log.d(TAG, "收到未注册的命令响应或其他类型响应")
+                addDebugMessage("收到未注册的命令响应: $payload")
+            }
+
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ 解析命令响应失败", e)
+            addDebugMessage("❌ 解析命令响应失败: ${e.message}")
+        }
+    }
+
+    /**
+     * 检查设备状态冲突
+     * 避免三个开关同时开启可能造成的问题
+     */
+    private fun checkDeviceStateConflict(
+        ventilation: Boolean?,
+        disinfection: Boolean?,
+        heating: Boolean?
+    ): Boolean {
+        // 统计要开启的功能数量
+        var enabledCount = 0
+        if (ventilation == true) enabledCount++
+        if (disinfection == true) enabledCount++
+        if (heating == true) enabledCount++
+
+        // 如果同时开启超过2个功能，视为冲突
+        if (enabledCount > 2) {
+            Log.w(TAG, "⚠️ 状态冲突：不建议同时开启超过2个功能")
+            addDebugMessage("⚠️ 状态冲突：同时开启功能过多")
+            return true
+        }
+
+        // 特殊冲突检查：通风和加热同时开启可能影响效果
+        if (ventilation == true && heating == true) {
+            Log.w(TAG, "⚠�� 状态冲突：通��和加热同时开启可能影响加热效果")
+            addDebugMessage("⚠️ 状态冲突：通风和加热功能冲突")
+            return true
+        }
+
+        return false
+    }
+
+    /**
+     * 显示Toast提示
+     */
+    private fun showToast(message: String) {
+        appContext?.let { context ->
+            serviceScope.launch(Dispatchers.Main) {
+                Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 }

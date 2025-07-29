@@ -100,6 +100,9 @@ fun DeviceScreen(navController: NavController? = null) {
     // 获取Context
     val context = LocalContext.current
 
+    // 获取MQTT服务实例
+    val mqttService = remember { com.example.petnestiq.service.HuaweiIoTDAMqttService.getInstance() }
+
     // 使用设备数据中的状态，而不是本地状态
     // 当UI状态变化时，更新DeviceDataManager，进而触发MQTT指令下发
 
@@ -281,13 +284,35 @@ fun DeviceScreen(navController: NavController? = null) {
                 SwitchCard(
                     label = "通风开关",
                     checked = deviceData.ventilationStatus,
-                    onCheckedChange = { deviceDataManager.updateVentilationStatus(it) },
+                    onCheckedChange = { enabled ->
+                        // 更新本地状态
+                        deviceDataManager.updateVentilationStatus(enabled)
+                        // 发送控制指令到设备
+                        mqttService.sendVentilationCommand(enabled) { success, message ->
+                            if (!success) {
+                                // 如果发送失败，回滚本地状态
+                                deviceDataManager.updateVentilationStatus(!enabled)
+                                android.util.Log.w("DeviceScreen", "通风控制指令发送失败: $message")
+                            }
+                        }
+                    },
                     modifier = Modifier.weight(1f)
                 )
                 SwitchCard(
                     label = "消毒开关",
                     checked = deviceData.disinfectionStatus,
-                    onCheckedChange = { deviceDataManager.updateDisinfectionStatus(it) },
+                    onCheckedChange = { enabled ->
+                        // 更新本地状态
+                        deviceDataManager.updateDisinfectionStatus(enabled)
+                        // 发送控制指令到设备
+                        mqttService.sendDisinfectionCommand(enabled) { success, message ->
+                            if (!success) {
+                                // 如果发送失败，回滚本地状态
+                                deviceDataManager.updateDisinfectionStatus(!enabled)
+                                android.util.Log.w("DeviceScreen", "消毒控制指令发送失败: $message")
+                            }
+                        }
+                    },
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -295,9 +320,31 @@ fun DeviceScreen(navController: NavController? = null) {
             // 第四行：加热状态（独占一行）
             HeatingCard(
                 enabled = deviceData.heatingStatus,
-                onEnabledChange = { deviceDataManager.updateHeatingStatus(it) },
+                onEnabledChange = { enabled ->
+                    // 更新本地状态
+                    deviceDataManager.updateHeatingStatus(enabled)
+                    // 发送控制指令到设备
+                    mqttService.sendHeatingCommand(enabled) { success, message ->
+                        if (!success) {
+                            // 如果发送失败，回滚本地状态
+                            deviceDataManager.updateHeatingStatus(!enabled)
+                            android.util.Log.w("DeviceScreen", "加热控制指令发送失败: $message")
+                        }
+                    }
+                },
                 targetTemperature = deviceData.targetTemperature.toInt(),
-                onTemperatureChange = { deviceDataManager.updateTargetTemperature(it.toFloat()) },
+                onTemperatureChange = { temperature ->
+                    // 更新本地状态
+                    deviceDataManager.updateTargetTemperature(temperature.toFloat())
+                    // 发送目标温度设置指令到设备
+                    mqttService.sendTargetTemperatureCommand(temperature) { success, message ->
+                        if (!success) {
+                            // 如果发送失败，回滚本地状态
+                            deviceDataManager.updateTargetTemperature(deviceData.targetTemperature)
+                            android.util.Log.w("DeviceScreen", "目标温度设置指令发送失败: $message")
+                        }
+                    }
+                },
                 modifier = Modifier
             )
 
@@ -353,7 +400,7 @@ fun EnvironmentCard(
                 fontWeight = FontWeight.Bold
             )
 
-            // 第三行显示曲线图
+            // 第三���显示曲线图
             Spacer(modifier = Modifier.weight(1f))
             MiniChart(
                 data = chartData,
@@ -745,7 +792,7 @@ fun CloudVideoMonitorCard(
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text(
-                                    text = "正在连接...",
+                                    text = "正��连接...",
                                     color = Color.White.copy(alpha = 0.8f),
                                     style = MaterialTheme.typography.bodySmall
                                 )
