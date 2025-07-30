@@ -488,6 +488,41 @@ fun ProfileScreen(navController: androidx.navigation.NavController? = null) {
                 onDismiss = { showAboutDialog = false }
             )
         }
+
+        // 版权信息
+        Spacer(modifier = Modifier.weight(1f)) // 推送到底部
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "@超小韓 版权所有",
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.Gray,
+                fontSize = 11.sp
+            )
+
+            Text(
+                text = "当前仅为测试版（v2.0.0），实时监控、实时对讲功能尚未实现",
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.Gray,
+                fontSize = 11.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = 2.dp)
+            )
+
+            Text(
+                text = "若使用中有任何问题，请邮箱提交至chaoxiaohan@chaoxiaohan.cyou",
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.Gray,
+                fontSize = 11.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = 2.dp)
+            )
+        }
     }
 }
 
