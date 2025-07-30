@@ -91,7 +91,6 @@ object MessageTemplates {
     val deviceTemplates = mapOf(
         "connection_lost" to "设备连接丢失，正在尝试重新连接...",
         "connection_restored" to "设备连接已恢复",
-        "low_battery" to "设备电量不足，请及时充电",
         "temperature_warning" to "温度异常，当前温度：{temperature}°C",
         "humidity_warning" to "湿度异常，当前湿度：{humidity}%",
         "food_low" to "食物余量不足，剩余：{amount}g",

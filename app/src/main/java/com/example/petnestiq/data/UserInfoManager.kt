@@ -20,11 +20,11 @@ data class UserInfo(
     val petBreed: String,
     val petAge: String,
     val avatarResourceId: Int = com.example.petnestiq.R.drawable.cat,
-    val avatarUri: String? = null, // 存储相册选择的图片URI
-    val savedAvatarPath: String? = null // 存储保存到应用内的头像文件路径
+    val avatarUri: String? = null,
+    val savedAvatarPath: String? = null
 )
 
-// 用户信息管理器（单例模式）
+// 用户信息管理器
 class UserInfoManager private constructor(private val context: Context) {
 
     private val prefs: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -56,7 +56,6 @@ class UserInfoManager private constructor(private val context: Context) {
     // 从SharedPreferences加载用户信息
     private fun loadUserInfo(): UserInfo {
         val savedPath = prefs.getString(KEY_SAVED_AVATAR_PATH, null)
-        // 检查保存的头像文件是否还存在
         val validSavedPath = if (savedPath != null && File(savedPath).exists()) {
             savedPath
         } else {
@@ -86,7 +85,7 @@ class UserInfoManager private constructor(private val context: Context) {
         }
     }
 
-    // 保存头像���应用内部存储
+    // 保存头像应用内部存储
     private fun saveAvatarToInternalStorage(uri: Uri): String? {
         return try {
             val inputStream = context.contentResolver.openInputStream(uri)
@@ -94,7 +93,7 @@ class UserInfoManager private constructor(private val context: Context) {
             inputStream?.close()
 
             if (bitmap != null) {
-                // 压缩图片以节省空间
+                // 压缩图片
                 val compressedBitmap = compressBitmap(bitmap, 512, 512)
 
                 val avatarFile = File(context.filesDir, AVATAR_FILENAME)
@@ -116,7 +115,7 @@ class UserInfoManager private constructor(private val context: Context) {
         }
     }
 
-    // 压缩图片到指定尺寸
+    // 压缩图片
     private fun compressBitmap(bitmap: Bitmap, maxWidth: Int, maxHeight: Int): Bitmap {
         val width = bitmap.width
         val height = bitmap.height
@@ -187,7 +186,6 @@ class UserInfoManager private constructor(private val context: Context) {
             saveUserInfo(newUserInfo)
         } catch (e: Exception) {
             e.printStackTrace()
-            // 如果保存失败，仍然更新URI，但可能在重启后失效
             val newUserInfo = _userInfo.value.copy(avatarUri = uri)
             _userInfo.value = newUserInfo
             saveUserInfo(newUserInfo)

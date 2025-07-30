@@ -21,7 +21,9 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.petnestiq.screens.*
 import com.example.petnestiq.data.DataType
-
+/*
+* 通过底部导航栏切换主页面，通过路由跳转到详细页面，所有页面都由 Compose 组件实现
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainNavigation() {

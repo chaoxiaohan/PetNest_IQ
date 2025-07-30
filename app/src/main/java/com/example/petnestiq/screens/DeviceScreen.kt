@@ -59,7 +59,7 @@ data class ChartDataPoint(
 // 生成模拟数据的函数
 fun generateTemperatureData(): List<ChartDataPoint> {
     return (0..23).map { hour ->
-        // 模拟温度变化：夜间较低，白天较高
+        // 模拟温度变化
         val baseTemp = 20f + 8f * sin((hour - 6) * Math.PI / 12).toFloat() + Random.nextFloat() * 3f
         ChartDataPoint(hour, baseTemp.coerceIn(15f, 35f))
     }
@@ -103,18 +103,7 @@ fun DeviceScreen(navController: NavController? = null) {
     // 获取MQTT服务实例
     val mqttService = remember { com.example.petnestiq.service.HuaweiIoTDAMqttService.getInstance() }
 
-    // 使用设备数据中的状态，而不是本地状态
-    // 当UI状态变化时，更新DeviceDataManager，进而触发MQTT指令下发
-
     val scrollState = rememberScrollState()
-
-    // 移除模拟数据更新，使用MQTT接收到的真实数据
-    // LaunchedEffect(Unit) {
-    //     while (true) {
-    //         delay(30000) // 30秒
-    //         deviceDataManager.simulateDataUpdate()
-    //     }
-    // }
 
     Column(
         modifier = Modifier
@@ -122,14 +111,14 @@ fun DeviceScreen(navController: NavController? = null) {
             .verticalScroll(scrollState)
             .padding(16.dp)
     ) {
-        // 上半部分 - 固定高度而不是比例
+        // 上半部分
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(280.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // 连接状态卡片 - 缩小并居中
+            // 连接状态卡片
             Card(
                 modifier = Modifier
                     .fillMaxWidth(0.4f)
@@ -185,7 +174,7 @@ fun DeviceScreen(navController: NavController? = null) {
                 }
             }
 
-            // 设备图片区域
+            // 设备图片
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -317,7 +306,7 @@ fun DeviceScreen(navController: NavController? = null) {
                 )
             }
 
-            // 第四行：加热状态（独占一行）
+            // 第四行：加热状态
             HeatingCard(
                 enabled = deviceData.heatingStatus,
                 onEnabledChange = { enabled ->
@@ -381,7 +370,7 @@ fun EnvironmentCard(
                 .fillMaxSize()
                 .padding(12.dp)
         ) {
-            // 标题在左上角，字号较大
+            // 标题
             Text(
                 text = label,
                 style = MaterialTheme.typography.titleMedium,
@@ -400,7 +389,7 @@ fun EnvironmentCard(
                 fontWeight = FontWeight.Bold
             )
 
-            // 第三���显示曲线图
+            // 显示曲线图
             Spacer(modifier = Modifier.weight(1f))
             MiniChart(
                 data = chartData,
@@ -427,7 +416,7 @@ fun SwitchCard(
             containerColor = if (checked)
                 MaterialTheme.colorScheme.tertiaryContainer
             else
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)  // 灰色状态
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)  // 关闭时为灰色状态
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
@@ -748,7 +737,7 @@ fun CloudVideoMonitorCard(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // 视频播放区域 - 增加高度
+            // 视频播放区域
             Card(
                 modifier = Modifier
                     .fillMaxWidth()

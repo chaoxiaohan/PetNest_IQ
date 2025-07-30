@@ -20,7 +20,7 @@ data class DeviceData(
     val lastUpdateTime: String = getCurrentTime()
 )
 
-// 获取当前时间的辅助函数
+// 获取当前时间
 private fun getCurrentTime(): String {
     val formatter = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
     return formatter.format(java.util.Date())
@@ -124,17 +124,17 @@ class DeviceDataManager private constructor() {
     }
 
     // 模拟数据更新（用于测试）
-    fun simulateDataUpdate() {
-        val currentData = _deviceData.value
-        val newData = currentData.copy(
-            temperature = (currentData.temperature + (Random.nextFloat() - 0.5f) * 2).coerceIn(15f, 35f),
-            humidity = (currentData.humidity + (Random.nextFloat() - 0.5f) * 5).coerceIn(40f, 85f),
-            foodAmount = maxOf(0f, currentData.foodAmount - Random.nextFloat() * 10),
-            waterAmount = maxOf(0f, currentData.waterAmount - Random.nextFloat() * 15),
-            lastUpdateTime = getCurrentTime()
-        )
-        _deviceData.value = newData
-    }
+//    fun simulateDataUpdate() {
+//        val currentData = _deviceData.value
+//        val newData = currentData.copy(
+//            temperature = (currentData.temperature + (Random.nextFloat() - 0.5f) * 2).coerceIn(15f, 35f),
+//            humidity = (currentData.humidity + (Random.nextFloat() - 0.5f) * 5).coerceIn(40f, 85f),
+//            foodAmount = maxOf(0f, currentData.foodAmount - Random.nextFloat() * 10),
+//            waterAmount = maxOf(0f, currentData.waterAmount - Random.nextFloat() * 15),
+//            lastUpdateTime = getCurrentTime()
+//        )
+//        _deviceData.value = newData
+//    }
 
     // 获取指定数据类型的当前值
     fun getCurrentValue(dataType: DataType): Float {
@@ -146,11 +146,11 @@ class DeviceDataManager private constructor() {
         }
     }
 
-    // 获取格式化的数据值
-    fun getFormattedValue(dataType: DataType): String {
-        val value = getCurrentValue(dataType)
-        return "${value.toInt()}${dataType.unit}"
-    }
+//    // 获取格式化的数据值
+//    fun getFormattedValue(dataType: DataType): String {
+//        val value = getCurrentValue(dataType)
+//        return "${value.toInt()}${dataType.unit}"
+//    }
 }
 
 // 数据类型枚举（移动到这里以便共享）
