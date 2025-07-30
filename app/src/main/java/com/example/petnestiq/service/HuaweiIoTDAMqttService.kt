@@ -69,9 +69,6 @@ class HuaweiIoTDAMqttService private constructor() {
     private val _lastSentCommand = MutableStateFlow<String?>(null)
     val lastSentCommand: StateFlow<String?> = _lastSentCommand.asStateFlow()
 
-    // 上一次发送的设备状态，用于判断是否需要下发指令
-    private val lastSentStates = AtomicReference<DeviceData?>(null)
-
     // 添加上下文引用用于显示Toast
     private var appContext: Context? = null
 
@@ -139,6 +136,9 @@ class HuaweiIoTDAMqttService private constructor() {
 
                 // 开始定期获取设备状态
                 startDataPolling()
+
+                // 开始监听设备状态变化并发送控制消息
+                startDeviceStateMonitoring()
 
                 // 移除监控设备状态变化并下发指令的功能，因为不需要上报数据给MQTT平台
                 // startCommandMonitoring()
@@ -1368,6 +1368,112 @@ class HuaweiIoTDAMqttService private constructor() {
         appContext?.let { context ->
             serviceScope.launch(Dispatchers.Main) {
                 Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    /**
+     * 发送设备控制消息到华为云IoTDA平台
+     */
+    fun sendDeviceControlMessage(
+        ventilation: Int,
+        disinfection: Int,
+        heating: Int,
+        targetTemperature: Float
+    ) {
+        val config = currentConfig ?: return
+        if (!isConnected || mqttClient?.isConnected != true) {
+            Log.w(TAG, "MQTT未连接，无法发送控制消息")
+            return
+        }
+
+        try {
+            val topic = "\$oc/devices/688879e2d582f20018403921_text1/sys/properties/report"
+
+            // 构建符合华为云IoTDA标准的消息格式
+            val properties = JsonObject().apply {
+                addProperty("ventilation", ventilation)
+                addProperty("disinfection", disinfection)
+                addProperty("heating", heating)
+                        addProperty("target_temperature", targetTemperature)
+            }
+
+            val service = JsonObject().apply {
+                addProperty("service_id", "dataText")
+                add("properties", properties)
+            }
+
+            val services = com.google.gson.JsonArray().apply {
+                add(service)
+            }
+
+            val controlMessage = JsonObject().apply {
+                add("services", services)
+            }
+
+            val mqttMessage = MqttMessage(controlMessage.toString().toByteArray()).apply {
+                qos = 1
+            }
+
+            mqttClient?.publish(topic, mqttMessage)
+            Log.d(TAG, "发送设备控制消息: ${controlMessage.toString()}")
+            addDebugMessage("发送控制消息: ${controlMessage.toString()}")
+            _lastSentCommand.value = controlMessage.toString()
+
+        } catch (e: Exception) {
+            Log.e(TAG, "发送设备控制消息失败", e)
+            addDebugMessage("发送控制消息失败: ${e.message}")
+        }
+    }
+
+    /**
+     * 开始监听设备状态变化并发送控制消息
+     */
+    private fun startDeviceStateMonitoring() {
+        serviceScope.launch {
+            var lastVentilation: Boolean? = null
+            var lastDisinfection: Boolean? = null
+            var lastHeating: Boolean? = null
+            var lastTargetTemperature: Float? = null
+
+            deviceDataManager.deviceData.collect { deviceData ->
+                var shouldSendMessage = false
+                
+                // 检查通风状态是否改变
+                if (lastVentilation != null && lastVentilation != deviceData.ventilationStatus) {
+                    shouldSendMessage = true
+                }
+                
+                // 检查消毒状态是否改变
+                if (lastDisinfection != null && lastDisinfection != deviceData.disinfectionStatus) {
+                    shouldSendMessage = true
+                }
+                
+                // 检查加热状态是否改变
+                if (lastHeating != null && lastHeating != deviceData.heatingStatus) {
+                    shouldSendMessage = true
+                }
+                
+                // 检查目标温度是否改变
+                if (lastTargetTemperature != null && lastTargetTemperature != deviceData.targetTemperature) {
+                    shouldSendMessage = true
+                }
+
+                // 如果有状态改变，发送控制消息
+                if (shouldSendMessage) {
+                    sendDeviceControlMessage(
+                        ventilation = if (deviceData.ventilationStatus) 1 else 0,
+                        disinfection = if (deviceData.disinfectionStatus) 1 else 0,
+                        heating = if (deviceData.heatingStatus) 1 else 0,
+                        targetTemperature = deviceData.targetTemperature
+                    )
+                }
+
+                // 更新最后状态
+                lastVentilation = deviceData.ventilationStatus
+                lastDisinfection = deviceData.disinfectionStatus
+                lastHeating = deviceData.heatingStatus
+                lastTargetTemperature = deviceData.targetTemperature
             }
         }
     }
