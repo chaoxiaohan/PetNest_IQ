@@ -16,6 +16,8 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -32,13 +34,20 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.runtime.LaunchedEffect
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.petnestiq.service.AudioRecordManager
 import com.example.petnestiq.R
 import com.example.petnestiq.navigation.NavigationItem
 import com.example.petnestiq.data.DeviceDataManager
@@ -99,6 +108,12 @@ fun DeviceScreen(navController: NavController? = null) {
 
     // 获取Context
     val context = LocalContext.current
+
+    // 添加音频录制管理器
+    val audioRecordManager = remember { AudioRecordManager.getInstance() }
+    val isRecording by audioRecordManager.isRecording.collectAsStateWithLifecycle()
+    val volumeLevel by audioRecordManager.volumeLevel.collectAsStateWithLifecycle()
+    val hapticFeedback = LocalHapticFeedback.current
 
     // 获取MQTT服务实例
     val mqttService = remember { com.example.petnestiq.service.HuaweiIoTDAMqttService.getInstance() }
@@ -340,7 +355,12 @@ fun DeviceScreen(navController: NavController? = null) {
             // 第五行：云端监控视频模块
             Spacer(modifier = Modifier.height(8.dp))
             CloudVideoMonitorCard(
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                context = context,
+                hapticFeedback = hapticFeedback,
+                audioRecordManager = audioRecordManager,
+                isRecording = isRecording,
+                volumeLevel = volumeLevel
             )
         }
     }
@@ -654,7 +674,12 @@ data class VideoStreamInfo(
 
 @Composable
 fun CloudVideoMonitorCard(
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    context: android.content.Context,
+    hapticFeedback: androidx.compose.ui.hapticfeedback.HapticFeedback,
+    audioRecordManager: AudioRecordManager,
+    isRecording: Boolean,
+    volumeLevel: Float
 ) {
     var videoStatus by remember { mutableStateOf(VideoStreamStatus.OFFLINE) }
     var isPlaying by remember { mutableStateOf(false) }
@@ -781,7 +806,7 @@ fun CloudVideoMonitorCard(
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text(
-                                    text = "正��连接...",
+                                    text = "正在连接...",
                                     color = Color.White.copy(alpha = 0.8f),
                                     style = MaterialTheme.typography.bodySmall
                                 )
@@ -885,6 +910,58 @@ fun CloudVideoMonitorCard(
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(24.dp)
                     )
+                }
+
+                // 对讲功能按钮
+                IconButton(
+                    onClick = {
+                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                        if (isRecording) {
+                            // 如果当前正在录音，则停止录音
+                            audioRecordManager.stopRecording()
+                        } else {
+                            // 启动录音
+                            if (audioRecordManager.hasRecordPermission(context)) {
+                                audioRecordManager.startRecording(context)
+                            } else {
+                                android.util.Log.e("DeviceScreen", "没有录音权限")
+                                // TODO: 请求录音权限
+                            }
+                        }
+                    },
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Icon(
+                        if (isRecording) Icons.Default.MicOff else Icons.Default.Mic,
+                        contentDescription = if (isRecording) "停止对讲" else "开始对讲",
+                        tint = if (isRecording) Color.Red else MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+
+                // 录音音量指示器（仅在录音时显示）
+                if (isRecording) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(Color.Red.copy(alpha = 0.1f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        // 音量级别指示器
+                        val animatedVolumeLevel by animateFloatAsState(
+                            targetValue = volumeLevel,
+                            animationSpec = tween(durationMillis = 100)
+                        )
+
+                        Canvas(modifier = Modifier.size(24.dp)) {
+                            drawCircle(
+                                color = Color.Red,
+                                radius = size.minDimension / 4 * (0.3f + animatedVolumeLevel * 0.7f)
+                            )
+                        }
+                    }
                 }
             }
 

@@ -1477,4 +1477,45 @@ class HuaweiIoTDAMqttService private constructor() {
             }
         }
     }
+
+    /**
+     * 发送语音数据到MQTT服务器
+     * @param audioData 音频数据的字节数组
+     * @param deviceId 目标设备ID
+     */
+    fun sendVoiceData(audioData: ByteArray, deviceId: String = "default_device") {
+        serviceScope.launch {
+            try {
+                if (!isConnected()) {
+                    Log.w(TAG, "MQTT未连接，无法发送语音数据")
+                    return@launch
+                }
+
+                // 构建语音消息
+                val voiceMessage = JsonObject().apply {
+                    addProperty("msgType", "voice")
+                    addProperty("deviceId", deviceId)
+                    addProperty("timestamp", System.currentTimeMillis())
+                    addProperty("audioFormat", "PCM")
+                    addProperty("sampleRate", 16000)
+                    addProperty("channels", 1)
+                    addProperty("bitDepth", 16)
+                    // 将音频数据编码为Base64
+                    addProperty("audioData", android.util.Base64.encodeToString(audioData, android.util.Base64.DEFAULT))
+                }
+
+                val topic = "voice/upload/$deviceId"
+                val message = MqttMessage(voiceMessage.toString().toByteArray())
+                message.qos = 1 // 确保消息可靠传输
+
+                mqttClient?.publish(topic, message)
+                Log.d(TAG, "语音数据发送成功，大小: ${audioData.size} bytes")
+                addDebugMessage("✅ 语音数据发送成功，大小: ${audioData.size} bytes")
+
+            } catch (e: Exception) {
+                Log.e(TAG, "发送语音数据失败", e)
+                addDebugMessage("❌ 发送语音数据失败: ${e.message}")
+            }
+        }
+    }
 }
