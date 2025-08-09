@@ -13,6 +13,9 @@ sealed class NavigationItem(
     object Message : NavigationItem("message", "消息", Icons.Default.Message)
     object Profile : NavigationItem("profile", "我的", Icons.Default.Person)
 
+    // AI聊天页面
+    object AiChat : NavigationItem("ai_chat", "AI助手", Icons.Default.SmartToy)
+
     // 详细数据界面路由
     object TemperatureDetail : NavigationItem("temperature_detail", "温度详情", Icons.Default.Thermostat)
     object HumidityDetail : NavigationItem("humidity_detail", "湿度详情", Icons.Default.WaterDrop)

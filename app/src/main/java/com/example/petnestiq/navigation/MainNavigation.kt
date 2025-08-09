@@ -55,10 +55,16 @@ fun MainNavigation() {
                 DeviceScreen(navController = navController)
             }
             composable(NavigationItem.Message.route) {
-                MessageScreen()
+                MessageScreen(navController = navController)
             }
             composable(NavigationItem.Profile.route) {
                 ProfileScreen(navController = navController)
+            }
+            // AI聊天页面
+            composable(NavigationItem.AiChat.route) {
+                AiChatScreen(
+                    onBackClick = { navController.popBackStack() }
+                )
             }
             // 详细数据界面
             composable(NavigationItem.TemperatureDetail.route) {

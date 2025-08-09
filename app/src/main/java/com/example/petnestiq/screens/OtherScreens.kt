@@ -10,15 +10,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.DoneAll
-import androidx.compose.material.icons.filled.Send
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -37,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.petnestiq.R
 import com.example.petnestiq.data.Message
@@ -48,7 +41,7 @@ import com.example.petnestiq.service.HuaweiIoTDAMqttService
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MessageScreen() {
+fun MessageScreen(navController: NavController? = null) {
     val context = LocalContext.current
     val messageManager = remember { MessageManager.getInstance(context) }
     val messages by messageManager.messages.collectAsStateWithLifecycle()
@@ -57,114 +50,139 @@ fun MessageScreen() {
     var selectedTab by remember { mutableStateOf(0) }
     val tabs = listOf("全部", "设备消息", "报警消息")
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-    ) {
-        // 标题栏
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp)
         ) {
-            Text(
-                text = "消息中心",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
+            // 标题栏
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "消息中心",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
 
-            Row {
-                // 未读消息计数
-                if (unreadCount > 0) {
-                    Badge(
-                        modifier = Modifier.padding(end = 8.dp)
-                    ) {
-                        Text(text = unreadCount.toString())
+                Row {
+                    // 未读消息计数
+                    if (unreadCount > 0) {
+                        Badge(
+                            modifier = Modifier.padding(end = 8.dp)
+                        ) {
+                            Text(text = unreadCount.toString())
+                        }
+                    }
+
+                    // 全部已读按钮
+                    if (unreadCount > 0) {
+                        IconButton(
+                            onClick = { messageManager.markAllAsRead() }
+                        ) {
+                            Icon(
+                                Icons.Default.DoneAll,
+                                contentDescription = "全部已读",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
                     }
                 }
+            }
 
-                // 全部已读按钮
-                if (unreadCount > 0) {
-                    IconButton(
-                        onClick = { messageManager.markAllAsRead() }
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 选项卡
+            TabRow(
+                selectedTabIndex = selectedTab,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                tabs.forEachIndexed { index, title ->
+                    Tab(
+                        selected = selectedTab == index,
+                        onClick = { selectedTab = index },
+                        text = { Text(title) }
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 消息列表
+            val filteredMessages = when (selectedTab) {
+                1 -> messages.filter { it.type == MessageType.DEVICE }
+                2 -> messages.filter { it.type == MessageType.ALARM }
+                else -> messages
+            }
+
+            if (filteredMessages.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Icon(
-                            Icons.Default.DoneAll,
-                            contentDescription = "全部已读",
-                            tint = MaterialTheme.colorScheme.primary
+                            Icons.Default.Info,
+                            contentDescription = null,
+                            modifier = Modifier.size(64.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "暂无消息",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        )
+                    }
+                }
+            } else {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(filteredMessages) { message ->
+                        MessageItem(
+                            message = message,
+                            onMessageClick = {
+                                if (!message.isRead) {
+                                    messageManager.markAsRead(message.id)
+                                }
+                            },
+                            onDeleteClick = {
+                                messageManager.deleteMessage(message.id)
+                            }
                         )
                     }
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // 选项卡
-        TabRow(
-            selectedTabIndex = selectedTab,
-            modifier = Modifier.fillMaxWidth()
+        // AI助手悬浮球
+        FloatingActionButton(
+            onClick = {
+                navController?.navigate(com.example.petnestiq.navigation.NavigationItem.AiChat.route)
+            },
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(16.dp)
+                .size(56.dp),
+            containerColor = MaterialTheme.colorScheme.primary,
+            elevation = FloatingActionButtonDefaults.elevation(
+                defaultElevation = 6.dp,
+                pressedElevation = 12.dp
+            )
         ) {
-            tabs.forEachIndexed { index, title ->
-                Tab(
-                    selected = selectedTab == index,
-                    onClick = { selectedTab = index },
-                    text = { Text(title) }
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // 消息列表
-        val filteredMessages = when (selectedTab) {
-            1 -> messages.filter { it.type == MessageType.DEVICE }
-            2 -> messages.filter { it.type == MessageType.ALARM }
-            else -> messages
-        }
-
-        if (filteredMessages.isEmpty()) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Icon(
-                        Icons.Default.Info,
-                        contentDescription = null,
-                        modifier = Modifier.size(64.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = "暂无消息",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                    )
-                }
-            }
-        } else {
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(filteredMessages) { message ->
-                    MessageItem(
-                        message = message,
-                        onMessageClick = {
-                            if (!message.isRead) {
-                                messageManager.markAsRead(message.id)
-                            }
-                        },
-                        onDeleteClick = {
-                            messageManager.deleteMessage(message.id)
-                        }
-                    )
-                }
-            }
+            Icon(
+                Icons.Default.SmartToy,
+                contentDescription = "AI助手",
+                tint = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier.size(24.dp)
+            )
         }
     }
 }
@@ -506,7 +524,7 @@ fun ProfileScreen(navController: androidx.navigation.NavController? = null) {
             )
 
             Text(
-                text = "当前仅为测试版（v2.0.0），实时监控、实时对讲功能尚未实现",
+                text = "当前仅为测试版（v3.0.0），实时监控功能尚未实现",
                 style = MaterialTheme.typography.bodySmall,
                 color = Color.Gray,
                 fontSize = 11.sp,
@@ -1255,78 +1273,6 @@ fun NetworkTestPanel() {
                 Text("手动获取设备数据")
             }
         }
-
-
-        // 设备影子为空的提示信息
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = Color(0xFFFF9800).copy(alpha = 0.1f)
-                )
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp)
-                ) {
-                    Text(
-                        text = "⚠️ 设备影子为空",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFFFF9800)
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Text(
-                        text = "可能的原因：",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium
-                    )
-
-                    val reasons = listOf(
-                        "1. 设备端程序未运行或未连接网络",
-                        "2. 设备还没有向华为云IoTDA平台上报过数据",
-                        "3. 设备ID或产品ID配置错误",
-                        "4. 设备端使用的Topic与应用端不匹配",
-                        "5. 设备端认证失败"
-                    )
-
-                    reasons.forEach { reason ->
-                        Text(
-                            text = reason,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(start = 8.dp, top = 2.dp)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Text(
-                        text = "建议解决方案：",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium
-                    )
-
-                    val solutions = listOf(
-                        "1. 检查设备端程序是否正常运行",
-                        "2. 确认设备端网络连接正常",
-                        "3. 验证设备ID和密钥是否正确",
-                        "4. 检查设备端是否成功连接到MQTT服务器",
-                        "5. 确认设备端正在向正确的Topic发送数据"
-                    )
-
-                    solutions.forEach { solution ->
-                        Text(
-                            text = solution,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(start = 8.dp, top = 2.dp)
-                        )
-                    }
-                }
-            }
-        }
     }
 }
 
@@ -1396,14 +1342,14 @@ fun AboutDialog(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
-                            text = "版本 1.1.0",
+                            text = "版本 3.0.0",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Medium,
                             color = MaterialTheme.colorScheme.onPrimaryContainer
                         )
 
                         Text(
-                            text = "构建日期：2025年7月27日",
+                            text = "构建日期：2025年8月9日",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
                         )
