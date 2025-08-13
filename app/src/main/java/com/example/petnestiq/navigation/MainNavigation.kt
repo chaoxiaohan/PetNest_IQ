@@ -97,6 +97,12 @@ fun MainNavigation() {
                     onBackClick = { navController.popBackStack() }
                 )
             }
+            // 设备管理页面
+            composable(NavigationItem.DeviceManagement.route) {
+                DeviceManagementScreen(
+                    onBackClick = { navController.popBackStack() }
+                )
+            }
         }
     }
 }

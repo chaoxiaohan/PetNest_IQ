@@ -466,7 +466,9 @@ fun ProfileScreen(navController: androidx.navigation.NavController? = null) {
         ProfileMenuItem(
             title = "设备管理",
             subtitle = "管理您的智能宠物窝设备",
-            onClick = { /* TODO: 跳转到设备管理 */ }
+            onClick = {
+                navController?.navigate(com.example.petnestiq.navigation.NavigationItem.DeviceManagement.route)
+            }
         )
 
         ProfileMenuItem(
@@ -838,7 +840,7 @@ fun MessageTestPanel() {
                     val templates = if (selectedMessageType == MessageType.DEVICE) {
                         listOf(
                             "设备连接成功",
-                            "温度异常，当前温度：30°C",
+                            "��度异常，当前温度：30°C",
                             "食物余量不足，剩余：50g",
                             "系统更新完成"
                         )

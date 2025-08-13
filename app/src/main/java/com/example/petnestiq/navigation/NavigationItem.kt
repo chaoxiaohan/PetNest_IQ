@@ -24,6 +24,9 @@ sealed class NavigationItem(
 
     // 用户资料编辑页面
     object UserProfileEdit : NavigationItem("user_profile_edit", "编辑资料", Icons.Default.Edit)
+
+    // 设备管理页面
+    object DeviceManagement : NavigationItem("device_management", "设备管理", Icons.Default.Settings)
 }
 
 val navigationItems = listOf(

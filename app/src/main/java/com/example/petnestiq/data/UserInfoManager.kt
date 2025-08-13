@@ -97,12 +97,6 @@ class UserInfoManager private constructor(private val context: Context) {
                 val compressedBitmap = compressBitmap(bitmap, 512, 512)
 
                 val avatarFile = File(context.filesDir, AVATAR_FILENAME)
-                val outputStream = FileOutputStream(avatarFile)
-
-                compressedBitmap.compress(Bitmap.CompressFormat.JPEG, 90, outputStream)
-                outputStream.close()
-
-                bitmap.recycle()
                 compressedBitmap.recycle()
 
                 avatarFile.absolutePath
