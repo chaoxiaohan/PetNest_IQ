@@ -19,6 +19,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "PetNest IQ"
+rootProject.name = "喵星人の智能窝"
 include(":app")
  
