@@ -9,14 +9,14 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 
 data class MqttConfig(
-    val serverUrl: String = "mqtt://localhost",
-    val port: Int = 1883,
-    val clientId: String = "PetNestIQ_Client",
-    val username: String = "",
-    val password: String = "",
+    val serverUrl: String = "ssl://e35491cb0c.st1.iotda-device.cn-north-4.myhuaweicloud.com",
+    val port: Int = 8883,
+    val clientId: String = "688879e2d582f20018403921_text1_0_0_2025072907",
+    val username: String = "688879e2d582f20018403921_text1",
+    val password: String = "bdd6a2f87eab3e9dd81325957547fa3b5b566f1abfbdb9850249b3b4984f277e",
     val subscribeTopic: String = "/device/data",
     val publishTopic: String = "/device/control",
-    val useSSL: Boolean = false,
+    val useSSL: Boolean = true,
     val autoReconnect: Boolean = true
 )
 
