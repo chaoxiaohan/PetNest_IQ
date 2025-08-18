@@ -474,7 +474,9 @@ fun ProfileScreen(navController: androidx.navigation.NavController? = null) {
         ProfileMenuItem(
             title = "设置中心",
             subtitle = "个人设置和系统偏好",
-            onClick = { /* TODO: 跳转到设置 */ }
+            onClick = {
+                navController?.navigate(com.example.petnestiq.navigation.NavigationItem.SettingsCenter.route)
+            }
         )
 
         ProfileMenuItem(
@@ -486,13 +488,9 @@ fun ProfileScreen(navController: androidx.navigation.NavController? = null) {
         ProfileMenuItem(
             title = "帮助与反馈",
             subtitle = "使用帮助和问题反馈",
-            onClick = { /* TODO: 跳转到帮助 */ }
-        )
-
-        ProfileMenuItem(
-            title = "关于应用",
-            subtitle = "应用版本和开发信息",
-            onClick = { showAboutDialog = true }
+            onClick = {
+                navController?.navigate(com.example.petnestiq.navigation.NavigationItem.UsageFeedback.route)
+            }
         )
 
         // 调试选项对话框

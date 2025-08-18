@@ -80,10 +80,10 @@ fun DeviceScreen(navController: NavController? = null) {
     // 每次重组时确保图表数据和当前值使用相同的时间点
     val currentHour = remember { java.time.LocalDateTime.now().hour }
     val currentMinute = remember { java.time.LocalDateTime.now().minute }
-
+    
     // 生成图表数据时使用相同的缓存，确保与详细页面一致
-    val temperatureChartData = remember(currentHour) {
-        MockDataGenerator.generate24HourChartData(DataType.TEMPERATURE)
+    val temperatureChartData = remember(currentHour) { 
+        MockDataGenerator.generate24HourChartData(DataType.TEMPERATURE) 
     }
     val humidityChartData = remember(currentHour) {
         MockDataGenerator.generate24HourChartData(DataType.HUMIDITY)

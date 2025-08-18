@@ -27,6 +27,12 @@ sealed class NavigationItem(
 
     // 设备管理页面
     object DeviceManagement : NavigationItem("device_management", "设备管理", Icons.Default.Settings)
+
+    // 设置中心页面
+    object SettingsCenter : NavigationItem("settings_center", "设置中心", Icons.Default.Settings)
+
+    // 使用与反馈页面
+    object UsageFeedback : NavigationItem("usage_feedback", "使用与反馈", Icons.Default.Feedback)
 }
 
 val navigationItems = listOf(

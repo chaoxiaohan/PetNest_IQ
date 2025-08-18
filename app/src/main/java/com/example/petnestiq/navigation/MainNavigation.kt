@@ -103,6 +103,21 @@ fun MainNavigation() {
                     onBackClick = { navController.popBackStack() }
                 )
             }
+            // 设置中心页面
+            composable(NavigationItem.SettingsCenter.route) {
+                SettingsCenterScreen(
+                    onBackClick = { navController.popBackStack() },
+                    onNavigateToFeedback = {
+                        navController.navigate(NavigationItem.UsageFeedback.route)
+                    }
+                )
+            }
+            // 使用与反馈页面
+            composable(NavigationItem.UsageFeedback.route) {
+                UsageFeedbackScreen(
+                    onBackClick = { navController.popBackStack() }
+                )
+            }
         }
     }
 }
