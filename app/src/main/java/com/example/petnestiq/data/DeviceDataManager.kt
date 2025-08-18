@@ -29,13 +29,13 @@ private fun getCurrentTime(): String {
 // 设备数据管理器（单例模式）
 class DeviceDataManager private constructor() {
 
-    // 使用StateFlow管理数据状态
+    // 使用StateFlow管理数据状态，初始化时使用统一的数据生成器
     private val _deviceData = MutableStateFlow(
         DeviceData(
-            temperature = 25f,
-            humidity = 70f,
-            foodAmount = 500f,
-            waterAmount = 500f
+            temperature = MockDataGenerator.getCurrentValue(DataType.TEMPERATURE),
+            humidity = MockDataGenerator.getCurrentValue(DataType.HUMIDITY),
+            foodAmount = MockDataGenerator.getCurrentValue(DataType.FOOD),
+            waterAmount = MockDataGenerator.getCurrentValue(DataType.WATER)
         )
     )
     val deviceData: StateFlow<DeviceData> = _deviceData.asStateFlow()
@@ -146,11 +146,28 @@ class DeviceDataManager private constructor() {
         }
     }
 
-//    // 获取格式化的数据值
-//    fun getFormattedValue(dataType: DataType): String {
-//        val value = getCurrentValue(dataType)
-//        return "${value.toInt()}${dataType.unit}"
-//    }
+    // 新增方法：刷新当前数据，确保与图表数据同步
+    fun refreshCurrentData() {
+        MockDataGenerator.clearCache() // 清除缓存以获取新的随机数据
+        _deviceData.value = _deviceData.value.copy(
+            temperature = MockDataGenerator.getCurrentValue(DataType.TEMPERATURE),
+            humidity = MockDataGenerator.getCurrentValue(DataType.HUMIDITY),
+            foodAmount = MockDataGenerator.getCurrentValue(DataType.FOOD),
+            waterAmount = MockDataGenerator.getCurrentValue(DataType.WATER),
+            lastUpdateTime = getCurrentTime()
+        )
+    }
+
+    // 新增方法：定期更新数据以保持同步
+    fun updateWithCurrentValues() {
+        _deviceData.value = _deviceData.value.copy(
+            temperature = MockDataGenerator.getCurrentValue(DataType.TEMPERATURE),
+            humidity = MockDataGenerator.getCurrentValue(DataType.HUMIDITY),
+            foodAmount = MockDataGenerator.getCurrentValue(DataType.FOOD),
+            waterAmount = MockDataGenerator.getCurrentValue(DataType.WATER),
+            lastUpdateTime = getCurrentTime()
+        )
+    }
 }
 
 // 数据类型枚举（移动到这里以便共享）

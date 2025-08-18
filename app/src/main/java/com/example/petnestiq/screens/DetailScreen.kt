@@ -31,18 +31,10 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.petnestiq.data.DeviceDataManager
 import com.example.petnestiq.data.DataType
+import com.example.petnestiq.data.MockDataGenerator
+import com.example.petnestiq.data.DetailDataPoint
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
-import kotlin.math.sin
-import kotlin.random.Random
-
-// 详细数据点
-data class DetailDataPoint(
-    val hour: Int,
-    val minute: Int,
-    val value: Float,
-    val timestamp: String
-)
 
 // 今日概览数据
 data class DailySummary(
@@ -66,9 +58,9 @@ fun DetailScreen(
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
     var showDatePicker by remember { mutableStateOf(false) }
 
-    // 生成模拟详细数据
+    // 使用统一的模拟数据生成器
     val detailData = remember(selectedDate, dataType) {
-        generateDetailData(dataType, selectedDate)
+        MockDataGenerator.generateDetailData(dataType, selectedDate)
     }
 
     // 计算今日概览
@@ -459,41 +451,6 @@ fun CustomDatePickerDialog(
     ) {
         DatePicker(state = datePickerState)
     }
-}
-
-// 生成模拟详细数据
-fun generateDetailData(dataType: DataType, date: LocalDate): List<DetailDataPoint> {
-    val data = mutableListOf<DetailDataPoint>()
-
-    for (hour in 0..23) {
-        for (minute in 0 until 60 step 15) { // 每15分钟一个数据点
-            val baseValue = when (dataType) {
-                DataType.TEMPERATURE -> 20f + 8f * sin((hour - 6) * Math.PI / 12).toFloat()
-                DataType.HUMIDITY -> 60f + 15f * sin((hour - 3) * Math.PI / 12).toFloat()
-                DataType.FOOD -> if (hour % 8 == 0 && minute == 0) 500f else maxOf(0f, 500f - (hour % 8) * 60f - minute * 1f)
-                DataType.WATER -> if (hour % 6 == 0 && minute == 0) 500f else maxOf(0f, 500f - (hour % 6) * 80f - minute * 1.5f)
-            }
-
-            val noise = Random.nextFloat() * 6f - 3f // ±3的随机噪声
-            val value = when (dataType) {
-                DataType.TEMPERATURE -> (baseValue + noise).coerceIn(15f, 35f)
-                DataType.HUMIDITY -> (baseValue + noise).coerceIn(40f, 85f)
-                DataType.FOOD -> (baseValue + noise).coerceIn(0f, 500f)
-                DataType.WATER -> (baseValue + noise).coerceIn(0f, 500f)
-            }
-
-            data.add(
-                DetailDataPoint(
-                    hour = hour,
-                    minute = minute,
-                    value = value,
-                    timestamp = String.format("%02d:%02d", hour, minute)
-                )
-            )
-        }
-    }
-
-    return data
 }
 
 // 计算今日概览

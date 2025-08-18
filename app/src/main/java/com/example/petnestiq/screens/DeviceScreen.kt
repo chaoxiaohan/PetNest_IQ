@@ -52,6 +52,8 @@ import com.example.petnestiq.R
 import com.example.petnestiq.navigation.NavigationItem
 import com.example.petnestiq.data.DeviceDataManager
 import com.example.petnestiq.data.DataType
+import com.example.petnestiq.data.MockDataGenerator
+import com.example.petnestiq.data.ChartDataPoint
 import com.example.petnestiq.components.VideoStreamPlayer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -60,45 +62,6 @@ import kotlinx.coroutines.launch
 import kotlin.math.sin
 import kotlin.random.Random
 
-// 数据类定义
-data class ChartDataPoint(
-    val hour: Int,  // 0-24小时
-    val value: Float
-)
-
-// 生成模拟数据的函数
-fun generateTemperatureData(): List<ChartDataPoint> {
-    return (0..23).map { hour ->
-        // 模拟温度变化
-        val baseTemp = 20f + 8f * sin((hour - 6) * Math.PI / 12).toFloat() + Random.nextFloat() * 3f
-        ChartDataPoint(hour, baseTemp.coerceIn(15f, 35f))
-    }
-}
-
-fun generateHumidityData(): List<ChartDataPoint> {
-    return (0..23).map { hour ->
-        // 模拟湿度变化：相对稳定，有小幅波动
-        val baseHumidity = 60f + 15f * sin((hour - 3) * Math.PI / 12).toFloat() + Random.nextFloat() * 10f
-        ChartDataPoint(hour, baseHumidity.coerceIn(40f, 85f))
-    }
-}
-
-fun generateFoodData(): List<ChartDataPoint> {
-    return (0..23).map { hour ->
-        // 模拟食物量变化：逐渐减少，定时补充
-        val baseFood = if (hour % 8 == 0) 500f else 500f - (hour % 8) * 50f + Random.nextFloat() * 20f
-        ChartDataPoint(hour, baseFood.coerceIn(0f, 500f))
-    }
-}
-
-fun generateWaterData(): List<ChartDataPoint> {
-    return (0..23).map { hour ->
-        // 模拟水量变化：逐渐减少，定时补充
-        val baseWater = if (hour % 6 == 0) 500f else 500f - (hour % 6) * 70f + Random.nextFloat() * 30f
-        ChartDataPoint(hour, baseWater.coerceIn(0f, 500f))
-    }
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DeviceScreen(navController: NavController? = null) {
@@ -106,6 +69,47 @@ fun DeviceScreen(navController: NavController? = null) {
     val deviceDataManager = remember { DeviceDataManager.getInstance() }
     val deviceData by deviceDataManager.deviceData.collectAsStateWithLifecycle()
     val connectionStatus by deviceDataManager.connectionStatus.collectAsStateWithLifecycle()
+
+    // 确保数据同步 - 页面加载时立即同步数据
+    LaunchedEffect(Unit) {
+        // 清除缓存确保获取最新数据
+        MockDataGenerator.clearCache()
+        deviceDataManager.updateWithCurrentValues()
+    }
+
+    // 每次重组时确保图表数据和当前值使用相同的时间点
+    val currentHour = remember { java.time.LocalDateTime.now().hour }
+    val currentMinute = remember { java.time.LocalDateTime.now().minute }
+
+    // 生成图表数据时使用相同的缓存，确保与详细页面一致
+    val temperatureChartData = remember(currentHour) {
+        MockDataGenerator.generate24HourChartData(DataType.TEMPERATURE)
+    }
+    val humidityChartData = remember(currentHour) {
+        MockDataGenerator.generate24HourChartData(DataType.HUMIDITY)
+    }
+    val foodChartData = remember(currentHour) {
+        MockDataGenerator.generate24HourChartData(DataType.FOOD)
+    }
+    val waterChartData = remember(currentHour) {
+        MockDataGenerator.generate24HourChartData(DataType.WATER)
+    }
+
+    // 注意：显示的数值使用MQTT真实数据，图表使用模拟数据保持与详细页面一致
+
+    // 获取当前模拟数据值，确保与图表数据一致
+    val currentTemperature = remember(currentHour, currentMinute) {
+        MockDataGenerator.getCurrentValue(DataType.TEMPERATURE)
+    }
+    val currentHumidity = remember(currentHour, currentMinute) {
+        MockDataGenerator.getCurrentValue(DataType.HUMIDITY)
+    }
+    val currentFoodAmount = remember(currentHour, currentMinute) {
+        MockDataGenerator.getCurrentValue(DataType.FOOD)
+    }
+    val currentWaterAmount = remember(currentHour, currentMinute) {
+        MockDataGenerator.getCurrentValue(DataType.WATER)
+    }
 
     // 获取Context
     val context = LocalContext.current
@@ -238,16 +242,16 @@ fun DeviceScreen(navController: NavController? = null) {
             ) {
                 EnvironmentCard(
                     label = "温度",
-                    value = "${deviceData.temperature.toInt()}°C",
-                    chartData = generateTemperatureData(),
+                    value = "${deviceData.temperature.toInt()}°C", // 使用MQTT真实数据
+                    chartData = temperatureChartData, // 使用模拟数据与详细页面保持一致
                     chartColor = Color.Red,
                     modifier = Modifier.weight(1f),
                     onClick = { navController?.navigate(NavigationItem.TemperatureDetail.route) }
                 )
                 EnvironmentCard(
                     label = "湿度",
-                    value = "${deviceData.humidity.toInt()}%",
-                    chartData = generateHumidityData(),
+                    value = "${deviceData.humidity.toInt()}%", // 使用MQTT真实数据
+                    chartData = humidityChartData, // 使用模拟数据与详细页面保持一致
                     chartColor = Color.Blue,
                     modifier = Modifier.weight(1f),
                     onClick = { navController?.navigate(NavigationItem.HumidityDetail.route) }
@@ -263,16 +267,16 @@ fun DeviceScreen(navController: NavController? = null) {
             ) {
                 EnvironmentCard(
                     label = "食物量",
-                    value = "${deviceData.foodAmount.toInt()}g",
-                    chartData = generateFoodData(),
+                    value = "${deviceData.foodAmount.toInt()}g", // 使用MQTT真实数据
+                    chartData = foodChartData, // 使用模拟数据与详细页面保持一致
                     chartColor = Color.Green,
                     modifier = Modifier.weight(1f),
                     onClick = { navController?.navigate(NavigationItem.FoodDetail.route) }
                 )
                 EnvironmentCard(
                     label = "水量",
-                    value = "${deviceData.waterAmount.toInt()}ml",
-                    chartData = generateWaterData(),
+                    value = "${deviceData.waterAmount.toInt()}ml", // 使用MQTT真实数据
+                    chartData = waterChartData, // 使用模拟数据与详细页面保持一致
                     chartColor = Color.Cyan,
                     modifier = Modifier.weight(1f),
                     onClick = { navController?.navigate(NavigationItem.WaterDetail.route) }
@@ -816,4 +820,3 @@ fun CloudVideoMonitorCard(
 fun DeviceScreenPreview() {
     DeviceScreen()
 }
-
