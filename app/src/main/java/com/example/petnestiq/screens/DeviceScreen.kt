@@ -245,6 +245,7 @@ fun DeviceScreen(navController: NavController? = null) {
                     value = "${deviceData.temperature.toInt()}°C", // 使用MQTT真实数据
                     chartData = temperatureChartData, // 使用模拟数据与详细页面保持一致
                     chartColor = Color.Red,
+                    iconResId = R.drawable.temperature, // 温度图标
                     modifier = Modifier.weight(1f),
                     onClick = { navController?.navigate(NavigationItem.TemperatureDetail.route) }
                 )
@@ -253,6 +254,7 @@ fun DeviceScreen(navController: NavController? = null) {
                     value = "${deviceData.humidity.toInt()}%", // 使用MQTT真实数据
                     chartData = humidityChartData, // 使用模拟数据与详细页面保持一致
                     chartColor = Color.Blue,
+                    iconResId = R.drawable.humidity, // 湿度图标
                     modifier = Modifier.weight(1f),
                     onClick = { navController?.navigate(NavigationItem.HumidityDetail.route) }
                 )
@@ -270,6 +272,7 @@ fun DeviceScreen(navController: NavController? = null) {
                     value = "${deviceData.foodAmount.toInt()}g", // 使用MQTT真实数据
                     chartData = foodChartData, // 使用模拟数据与详细页面保持一致
                     chartColor = Color.Green,
+                    iconResId = R.drawable.food, // 食物图标
                     modifier = Modifier.weight(1f),
                     onClick = { navController?.navigate(NavigationItem.FoodDetail.route) }
                 )
@@ -278,6 +281,7 @@ fun DeviceScreen(navController: NavController? = null) {
                     value = "${deviceData.waterAmount.toInt()}ml", // 使用MQTT真实数据
                     chartData = waterChartData, // 使用模拟数据与详细页面保持一致
                     chartColor = Color.Cyan,
+                    iconResId = R.drawable.water, // 水量图标
                     modifier = Modifier.weight(1f),
                     onClick = { navController?.navigate(NavigationItem.WaterDetail.route) }
                 )
@@ -377,6 +381,7 @@ fun EnvironmentCard(
     value: String,
     chartData: List<ChartDataPoint>,
     chartColor: Color,
+    iconResId: Int, // 新增图标资源ID参数
     modifier: Modifier = Modifier,
     onClick: () -> Unit = {}
 ) {
@@ -395,14 +400,26 @@ fun EnvironmentCard(
                 .fillMaxSize()
                 .padding(12.dp)
         ) {
-            // 标题
-            Text(
-                text = label,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSecondaryContainer,
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp
-            )
+            // 图标和标题行
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(
+                    painter = painterResource(id = iconResId),
+                    contentDescription = label,
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp
+                )
+            }
 
             Spacer(modifier = Modifier.height(8.dp))
 
