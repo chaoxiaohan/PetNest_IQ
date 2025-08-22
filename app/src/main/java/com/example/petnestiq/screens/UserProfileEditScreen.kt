@@ -326,9 +326,9 @@ fun UserProfileEditScreen(
                     )
                 )
 
-                // 如果选择了新的相册图片，保存URI
+                // 如果选择了新的相册图片，保存头像到本地存储
                 selectedImageUri?.let { uri ->
-                    userInfoManager.updateAvatarUri(uri.toString())
+                    userInfoManager.updateAvatarFromUri(uri)
                 }
 
                 onBackClick()

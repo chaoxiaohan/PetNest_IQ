@@ -97,6 +97,9 @@ class UserInfoManager private constructor(private val context: Context) {
                 val compressedBitmap = compressBitmap(bitmap, 512, 512)
 
                 val avatarFile = File(context.filesDir, AVATAR_FILENAME)
+                val outputStream = FileOutputStream(avatarFile)
+                compressedBitmap.compress(Bitmap.CompressFormat.JPEG, 90, outputStream)
+                outputStream.close()
                 compressedBitmap.recycle()
 
                 avatarFile.absolutePath
@@ -169,9 +172,7 @@ class UserInfoManager private constructor(private val context: Context) {
     // 更新头像（URI）- 同时保存到内部存储
     fun updateAvatarUri(uri: String) {
         try {
-            val uriObj = Uri.parse(uri)
-            val savedPath = saveAvatarToInternalStorage(uriObj)
-
+            val savedPath = saveAvatarToInternalStorage(Uri.parse(uri))
             val newUserInfo = _userInfo.value.copy(
                 avatarUri = uri,
                 savedAvatarPath = savedPath
@@ -180,6 +181,7 @@ class UserInfoManager private constructor(private val context: Context) {
             saveUserInfo(newUserInfo)
         } catch (e: Exception) {
             e.printStackTrace()
+            // 如果保存失败，至少保存URI
             val newUserInfo = _userInfo.value.copy(avatarUri = uri)
             _userInfo.value = newUserInfo
             saveUserInfo(newUserInfo)
@@ -195,6 +197,25 @@ class UserInfoManager private constructor(private val context: Context) {
             }
         } catch (e: Exception) {
             e.printStackTrace()
+        }
+    }
+
+    // 添加新的方法：直接从URI更新并保存头像
+    fun updateAvatarFromUri(uri: Uri) {
+        try {
+            val savedPath = saveAvatarToInternalStorage(uri)
+            val newUserInfo = _userInfo.value.copy(
+                avatarUri = uri.toString(),
+                savedAvatarPath = savedPath
+            )
+            _userInfo.value = newUserInfo
+            saveUserInfo(newUserInfo)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            // 如果保存失败，至少保存URI
+            val newUserInfo = _userInfo.value.copy(avatarUri = uri.toString())
+            _userInfo.value = newUserInfo
+            saveUserInfo(newUserInfo)
         }
     }
 
